@@ -97,7 +97,9 @@ async function handleTextMessage(
         // Auto-select first child
         const firstChild = children[0];
         await createOrUpdateState({ line_user_id: userId, active_child_id: firstChild.child_id, last_print_id: null, waiting_for_text_answer: false, pending_questions: [] });
-        state!.active_child_id = firstChild.child_id;
+        if (state) {
+          state.active_child_id = firstChild.child_id;
+        }
       }
       // TODO: Call Print Generator Agent
       await replyText(replyToken, "プリントを作成中... 📝");

@@ -26,7 +26,7 @@ export class MonitoringConstruct extends Construct {
       }),
       threshold: 3,
       evaluationPeriods: 1,
-      alarmDescription: "Lambda error rate > 5%",
+      alarmDescription: "Lambda error count >= 3 in 5 minutes",
     });
     errorAlarm.addAlarmAction(new cw_actions.SnsAction(alertTopic));
 

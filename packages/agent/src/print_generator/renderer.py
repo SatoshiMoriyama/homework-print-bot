@@ -218,5 +218,8 @@ async def render_to_png(html: str) -> bytes:
     #     await browser.close()
     #     return png_bytes
 
+    # TODO: This is a placeholder that returns UTF-8 encoded HTML, NOT a valid PNG.
+    # Downstream code uploads this as ContentType=image/png, which will be invalid.
+    # This will NOT produce a valid PNG until Puppeteer/Playwright is integrated.
     # Placeholder
     return html.encode("utf-8")

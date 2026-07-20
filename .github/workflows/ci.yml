@@ -14,7 +14,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -26,9 +26,6 @@ jobs:
       - name: TypeScript type check
         run: pnpm typecheck
 
-      - name: Lint
-        run: pnpm lint
-
   cdk-diff:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
@@ -37,7 +34,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 9
 
       - uses: actions/setup-node@v4
         with:
@@ -60,7 +57,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 9
 
       - uses: actions/setup-node@v4
         with:

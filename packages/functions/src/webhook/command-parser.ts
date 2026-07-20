@@ -68,21 +68,48 @@ export function isModificationInstruction(text: string): boolean {
 export function parseTextAnswers(text: string): { questionNumber: number; answerText: string }[] {
   const answers: { questionNumber: number; answerText: string }[] = [];
 
-  // Pattern: ② 3+5=8 or ②3+5=8
-  const pattern = /[①②③④⑤⑥⑦⑧⑨⑩]|(\d+)/g;
   const circleNumbers: Record<string, number> = {
     "①": 1, "②": 2, "③": 3, "④": 4, "⑤": 5,
     "⑥": 6, "⑦": 7, "⑧": 8, "⑨": 9, "⑩": 10,
   };
 
-  // Split by circle numbers or numbered patterns
-  const parts = text.split(/([①②③④⑤⑥⑦⑧⑨⑩])/);
+  // Try splitting by circled numbers first: ② 3+5=8 or ②3+5=8
+  const circleParts = text.split(/([①②③④⑤⑥⑦⑧⑨⑩])/);
 
-  for (let i = 1; i < parts.length; i += 2) {
-    const num = circleNumbers[parts[i]];
-    const answer = parts[i + 1]?.trim();
-    if (num && answer) {
+  if (circleParts.length > 1) {
+    for (let i = 1; i < circleParts.length; i += 2) {
+      const num = circleNumbers[circleParts[i]];
+      const answer = circleParts[i + 1]?.trim();
+      if (num && answer) {
+        answers.push({ questionNumber: num, answerText: answer });
+      }
+    }
+    return answers;
+  }
+
+  // Fallback: split by digit-based numbering like "2 3+5=8" or "2) 3+5=8"
+  const digitPattern = /(\d+)[)\s]\s*(.+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = digitPattern.exec(text)) !== null) {
+    const num = parseInt(match[1], 10);
+    const answer = match[2].trim();
+    if (num > 0 && num <= 10 && answer) {
       answers.push({ questionNumber: num, answerText: answer });
+    }
+  }
+
+  // If no structured matches found, try line-by-line parsing
+  if (answers.length === 0) {
+    const lines = text.split("\n");
+    for (const line of lines) {
+      const lineMatch = line.match(/^\s*(\d+)[)\s]\s*(.+)/);
+      if (lineMatch) {
+        const num = parseInt(lineMatch[1], 10);
+        const answer = lineMatch[2].trim();
+        if (num > 0 && num <= 10 && answer) {
+          answers.push({ questionNumber: num, answerText: answer });
+        }
+      }
     }
   }
 

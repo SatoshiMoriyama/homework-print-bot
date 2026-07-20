@@ -4,6 +4,8 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as nodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as s3 from "aws-cdk-lib/aws-s3";
+import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as path from "path";
 import { Construct } from "constructs";
 import { Tables } from "./dynamodb";
 
@@ -19,10 +21,18 @@ export class ApiConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ApiConstructProps) {
     super(scope, id);
 
+    // Read LINE secrets from SSM Parameter Store at runtime
+    const lineChannelSecret = ssm.StringParameter.valueForStringParameter(
+      this, "/homework-bot/line-channel-secret"
+    );
+    const lineChannelAccessToken = ssm.StringParameter.valueForStringParameter(
+      this, "/homework-bot/line-channel-access-token"
+    );
+
     // LINE Webhook Lambda
     this.webhookHandler = new nodejs.NodejsFunction(this, "WebhookHandler", {
       functionName: "homework-bot-webhook-handler",
-      entry: "../../packages/functions/src/webhook/handler.ts",
+      entry: path.join(__dirname, "../../../functions/src/webhook/handler.ts"),
       handler: "handler",
       runtime: lambda.Runtime.NODEJS_20_X,
       timeout: cdk.Duration.seconds(60),
@@ -35,8 +45,8 @@ export class ApiConstruct extends Construct {
         LEARNING_STATS_TABLE: props.tables.learningStats.tableName,
         USER_STATE_TABLE: props.tables.userState.tableName,
         BUCKET_NAME: props.bucket.bucketName,
-        LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET || "",
-        LINE_CHANNEL_ACCESS_TOKEN: process.env.LINE_CHANNEL_ACCESS_TOKEN || "",
+        LINE_CHANNEL_SECRET: lineChannelSecret,
+        LINE_CHANNEL_ACCESS_TOKEN: lineChannelAccessToken,
       },
       bundling: {
         minify: true,
