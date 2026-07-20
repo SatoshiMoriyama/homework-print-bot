@@ -1,0 +1,17 @@
+{
+  "name": "homework-print-bot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-powered homework print generator and grading system via LINE",
+  "scripts": {
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "cdk": "pnpm --filter @homework-print-bot/infra cdk"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
