@@ -1,23 +1,56 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { validateSignature, WebhookEvent, TextMessage, Client, MessageAPIResponseBase } from "@line/bot-sdk";
+import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm";
 import { parseCommand, isModificationInstruction, parseTextAnswers } from "./command-parser";
 import { getUserState, createOrUpdateState, setLastPrintId, clearWaitingState } from "../shared/state";
 import { getParent, createParent, getChildrenByFamily, createChild, findChildByNickname } from "../shared/family";
 
-const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || "";
-const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || "";
+const LINE_CHANNEL_SECRET_PARAM = process.env.LINE_CHANNEL_SECRET_PARAM || "";
+const LINE_CHANNEL_ACCESS_TOKEN_PARAM = process.env.LINE_CHANNEL_ACCESS_TOKEN_PARAM || "";
 
-const lineClient = new Client({
-  channelAccessToken: LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: LINE_CHANNEL_SECRET,
-});
+// SSM client and secret cache (cold start only)
+const ssmClient = new SSMClient({});
+let cachedChannelSecret: string | undefined;
+let cachedChannelAccessToken: string | undefined;
+
+async function getSSMParameter(paramName: string): Promise<string> {
+  const res = await ssmClient.send(
+    new GetParameterCommand({ Name: paramName, WithDecryption: true })
+  );
+  return res.Parameter?.Value ?? "";
+}
+
+async function getSecrets(): Promise<{ channelSecret: string; channelAccessToken: string }> {
+  if (!cachedChannelSecret) {
+    cachedChannelSecret = await getSSMParameter(LINE_CHANNEL_SECRET_PARAM);
+  }
+  if (!cachedChannelAccessToken) {
+    cachedChannelAccessToken = await getSSMParameter(LINE_CHANNEL_ACCESS_TOKEN_PARAM);
+  }
+  return { channelSecret: cachedChannelSecret, channelAccessToken: cachedChannelAccessToken };
+}
+
+let lineClient: Client | undefined;
+
+async function getLineClient(): Promise<Client> {
+  if (!lineClient) {
+    const { channelSecret, channelAccessToken } = await getSecrets();
+    lineClient = new Client({
+      channelAccessToken,
+      channelSecret,
+    });
+  }
+  return lineClient;
+}
 
 export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> {
+  const { channelSecret } = await getSecrets();
+
   // Verify LINE signature
   const signature = event.headers["x-line-signature"] || event.headers["X-Line-Signature"] || "";
   const body = event.body || "";
 
-  if (!validateSignature(body, LINE_CHANNEL_SECRET, signature)) {
+  if (!validateSignature(body, channelSecret, signature)) {
     return { statusCode: 403, body: "Invalid signature" };
   }
 
@@ -160,7 +193,8 @@ async function handleImageMessage(
 }
 
 async function replyText(replyToken: string, text: string): Promise<MessageAPIResponseBase> {
-  return lineClient.replyMessage(replyToken, { type: "text", text });
+  const client = await getLineClient();
+  return client.replyMessage(replyToken, { type: "text", text });
 }
 
 const WELCOME_MESSAGE = `ようこそ！しゅくだいプリントBotだよ 📝

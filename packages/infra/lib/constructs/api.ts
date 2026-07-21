@@ -21,13 +21,9 @@ export class ApiConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ApiConstructProps) {
     super(scope, id);
 
-    // Read LINE secrets from SSM Parameter Store at runtime
-    const lineChannelSecret = ssm.StringParameter.valueForStringParameter(
-      this, "/homework-bot/line-channel-secret"
-    );
-    const lineChannelAccessToken = ssm.StringParameter.valueForStringParameter(
-      this, "/homework-bot/line-channel-access-token"
-    );
+    // SSM Parameter names for LINE secrets (resolved at Lambda runtime)
+    const lineChannelSecretParam = "/homework-bot/line-channel-secret";
+    const lineChannelAccessTokenParam = "/homework-bot/line-channel-access-token";
 
     // LINE Webhook Lambda
     this.webhookHandler = new nodejs.NodejsFunction(this, "WebhookHandler", {
@@ -45,8 +41,8 @@ export class ApiConstruct extends Construct {
         LEARNING_STATS_TABLE: props.tables.learningStats.tableName,
         USER_STATE_TABLE: props.tables.userState.tableName,
         BUCKET_NAME: props.bucket.bucketName,
-        LINE_CHANNEL_SECRET: lineChannelSecret,
-        LINE_CHANNEL_ACCESS_TOKEN: lineChannelAccessToken,
+        LINE_CHANNEL_SECRET_PARAM: lineChannelSecretParam,
+        LINE_CHANNEL_ACCESS_TOKEN_PARAM: lineChannelAccessTokenParam,
       },
       bundling: {
         minify: true,
@@ -59,6 +55,30 @@ export class ApiConstruct extends Construct {
       table.grantReadWriteData(this.webhookHandler);
     });
     props.bucket.grantReadWrite(this.webhookHandler);
+
+    // SSM Parameter Store permissions (SecureString requires kms:Decrypt)
+    this.webhookHandler.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ssm:GetParameter"],
+        resources: [
+          cdk.Arn.format(
+            { service: "ssm", resource: "parameter", resourceName: "homework-bot/*" },
+            cdk.Stack.of(this)
+          ),
+        ],
+      })
+    );
+    this.webhookHandler.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["kms:Decrypt"],
+        resources: ["*"],
+        conditions: {
+          StringEquals: {
+            "kms:ViaService": `ssm.${cdk.Stack.of(this).region}.amazonaws.com`,
+          },
+        },
+      })
+    );
 
     // Bedrock permissions
     this.webhookHandler.addToRolePolicy(
