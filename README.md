@@ -58,15 +58,41 @@ uv sync
 cd ../..
 ```
 
-### 3. 環境変数の設定
+### 3. LINE チャネルの作成
 
-以下の環境変数を設定してください（`.env` ファイルまたは AWS Systems Manager Parameter Store 等で管理）。
+1. [LINE Official Account Manager](https://www.linebiz.com/jp/entry/) で LINE 公式アカウントを作成する
+2. LINE Official Account Manager の **設定 → Messaging API** で「Messaging API の利用を有効にする」を実行
+3. プロバイダーを選択し、Messaging API チャネルを作成する
+4. [LINE Developers コンソール](https://developers.line.biz/console/) にログインし、作成されたチャネルを開く
+5. **「チャネル基本設定」タブ** → 「チャネルシークレット」をコピー
+6. **「Messaging API設定」タブ** → ページ下部の「チャネルアクセストークン（長期）」で「発行」をクリックし、トークンをコピー
 
-| 変数名 | 説明 |
-|--------|------|
-| `LINE_CHANNEL_SECRET` | LINE チャネルシークレット |
-| `LINE_CHANNEL_ACCESS_TOKEN` | LINE チャネルアクセストークン |
-| `AWS_REGION` | AWS リージョン（`ap-northeast-1`） |
+> **Note**: LINE Developers コンソールから直接 Messaging API チャネルを作成することはできません（2024年9月以降）。必ず LINE Official Account Manager 経由で作成してください。
+
+### 4. シークレットの登録（AWS SSM Parameter Store）
+
+LINE のシークレットは AWS Systems Manager Parameter Store に `SecureString` として登録します。
+
+```bash
+aws ssm put-parameter \
+  --name "/homework-bot/line-channel-secret" \
+  --type "SecureString" \
+  --value "<チャネルシークレット>" \
+  --region ap-northeast-1
+
+aws ssm put-parameter \
+  --name "/homework-bot/line-channel-access-token" \
+  --type "SecureString" \
+  --value "<チャネルアクセストークン>" \
+  --region ap-northeast-1
+```
+
+| パラメータ名 | 説明 |
+|-------------|------|
+| `/homework-bot/line-channel-secret` | LINE チャネルシークレット |
+| `/homework-bot/line-channel-access-token` | LINE チャネルアクセストークン（長期） |
+
+> **Tip**: ローカル開発用には `.env` ファイルに値を記載できます（`.gitignore` 済み）。デプロイ時は SSM Parameter Store が使用されます。
 
 ## デプロイ手順
 
