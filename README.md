@@ -26,6 +26,7 @@ LINE を通じて子供向け学習プリントを AI で自動生成・採点�
 - **Amazon DynamoDB** - ユーザー状態、学習履歴、採点結果の保存
 - **Amazon S3** - プリント画像/PDF、回答画像の保存
 - **Amazon Bedrock** - Claude Sonnet 5（問題生成・手書き認識・採点）、Claude Haiku 4.5（コマンド解析）
+- **Amazon Bedrock AgentCore Runtime** - Strands Agents エージェントの実行環境（CDK で自動デプロイ）
 
 ## 前提条件
 
@@ -104,8 +105,21 @@ pnpm cdk bootstrap
 
 ### 2. デプロイ
 
+AgentCore Runtime を含むすべてのインフラが CDK で一括デプロイされます。
+
 ```bash
 pnpm cdk deploy
+```
+
+> **Note**: `packages/agent` の Python コードは CDK の `fromCodeAsset` により自動で zip パッケージング・S3 アップロードされます。事前に `cd packages/agent && uv sync` で依存を解決しておいてください。
+
+### ローカル開発（AgentCore CLI）
+
+ローカルでエージェントをテストする場合は、引き続き `agentcore dev` が利用できます。
+
+```bash
+cd packages/agent
+agentcore dev
 ```
 
 ### 3. LINE Webhook URL の設定
@@ -145,7 +159,6 @@ homework-print-bot/
 ├── tsconfig.base.json
 ├── packages/
 │   ├── agent/                          # Bedrock AgentCore (Python)
-│   │   ├── .bedrock_agentcore.yaml
 │   │   ├── pyproject.toml
 │   │   └── src/
 │   │       ├── __init__.py
@@ -181,6 +194,7 @@ homework-print-bot/
 │       ├── tsconfig.json
 │       └── lib/
 │           ├── constructs/
+│           │   ├── agentcore.ts
 │           │   ├── api.ts
 │           │   ├── dynamodb.ts
 │           │   ├── monitoring.ts
