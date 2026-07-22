@@ -68,6 +68,16 @@ export class ApiConstruct extends Construct {
         ],
       })
     );
+    const ssmParameterArns = [
+      cdk.Arn.format(
+        { service: "ssm", resource: "parameter", resourceName: "homework-bot/line-channel-secret" },
+        cdk.Stack.of(this)
+      ),
+      cdk.Arn.format(
+        { service: "ssm", resource: "parameter", resourceName: "homework-bot/line-channel-access-token" },
+        cdk.Stack.of(this)
+      ),
+    ];
     this.webhookHandler.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ["kms:Decrypt"],
@@ -75,6 +85,7 @@ export class ApiConstruct extends Construct {
         conditions: {
           StringEquals: {
             "kms:ViaService": `ssm.${cdk.Stack.of(this).region}.amazonaws.com`,
+            "kms:EncryptionContext:PARAMETER_ARN": ssmParameterArns,
           },
         },
       })
