@@ -5,27 +5,34 @@ import { parseCommand, isModificationInstruction, parseTextAnswers } from "./com
 import { getUserState, createOrUpdateState, setLastPrintId, clearWaitingState } from "../shared/state";
 import { getParent, createParent, getChildrenByFamily, createChild, findChildByNickname } from "../shared/family";
 
-const LINE_CHANNEL_SECRET_PARAM = process.env.LINE_CHANNEL_SECRET_PARAM || "";
-const LINE_CHANNEL_ACCESS_TOKEN_PARAM = process.env.LINE_CHANNEL_ACCESS_TOKEN_PARAM || "";
+const LINE_CHANNEL_SECRET_PARAM = process.env.LINE_CHANNEL_SECRET_PARAM;
+const LINE_CHANNEL_ACCESS_TOKEN_PARAM = process.env.LINE_CHANNEL_ACCESS_TOKEN_PARAM;
 
 // SSM client and secret cache (cold start only)
 const ssmClient = new SSMClient({});
 let cachedChannelSecret: string | undefined;
 let cachedChannelAccessToken: string | undefined;
 
-async function getSSMParameter(paramName: string): Promise<string> {
+async function getSSMParameter(paramName: string | undefined, envVarName: string): Promise<string> {
+  if (!paramName) {
+    throw new Error(`Environment variable "${envVarName}" is not configured (SSM parameter name is missing)`);
+  }
   const res = await ssmClient.send(
     new GetParameterCommand({ Name: paramName, WithDecryption: true })
   );
-  return res.Parameter?.Value ?? "";
+  const value = res.Parameter?.Value;
+  if (!value) {
+    throw new Error(`SSM parameter "${paramName}" (from ${envVarName}) returned empty value`);
+  }
+  return value;
 }
 
 async function getSecrets(): Promise<{ channelSecret: string; channelAccessToken: string }> {
-  if (!cachedChannelSecret) {
-    cachedChannelSecret = await getSSMParameter(LINE_CHANNEL_SECRET_PARAM);
+  if (cachedChannelSecret === undefined) {
+    cachedChannelSecret = await getSSMParameter(LINE_CHANNEL_SECRET_PARAM, "LINE_CHANNEL_SECRET_PARAM");
   }
-  if (!cachedChannelAccessToken) {
-    cachedChannelAccessToken = await getSSMParameter(LINE_CHANNEL_ACCESS_TOKEN_PARAM);
+  if (cachedChannelAccessToken === undefined) {
+    cachedChannelAccessToken = await getSSMParameter(LINE_CHANNEL_ACCESS_TOKEN_PARAM, "LINE_CHANNEL_ACCESS_TOKEN_PARAM");
   }
   return { channelSecret: cachedChannelSecret, channelAccessToken: cachedChannelAccessToken };
 }
