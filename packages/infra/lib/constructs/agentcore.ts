@@ -9,7 +9,7 @@ import { Tables } from "./dynamodb";
 export interface AgentCoreConstructProps {
   tables: Tables;
   bucket: s3.Bucket;
-  webhookHandler: lambda.IFunction;
+  webhookHandler: lambda.Function;
 }
 
 export class AgentCoreConstruct extends Construct {
@@ -21,7 +21,7 @@ export class AgentCoreConstruct extends Construct {
     const artifact = agentcore.AgentRuntimeArtifact.fromCodeAsset({
       path: path.join(__dirname, "../../../agent"),
       runtime: agentcore.AgentCoreRuntime.PYTHON_3_12,
-      entrypoint: ["opentelemetry-instrument", "main.py"],
+      entrypoint: ["opentelemetry-instrument", "src/main.py"],
     });
 
     this.runtime = new agentcore.Runtime(this, "HomeworkPrintBot", {
@@ -55,5 +55,11 @@ export class AgentCoreConstruct extends Construct {
 
     // Grant the webhook Lambda permission to invoke this runtime
     this.runtime.grantInvoke(props.webhookHandler);
+
+    // Pass the runtime ARN to the webhook Lambda so it can invoke the runtime
+    props.webhookHandler.addEnvironment(
+      "AGENTCORE_RUNTIME_ARN",
+      this.runtime.agentRuntimeArn
+    );
   }
 }
