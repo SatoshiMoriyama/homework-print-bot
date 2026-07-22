@@ -13,26 +13,26 @@ const ssmClient = new SSMClient({});
 let cachedChannelSecret: string | undefined;
 let cachedChannelAccessToken: string | undefined;
 
-async function getSSMParameter(paramName: string): Promise<string> {
+async function getSSMParameter(paramName: string | undefined, envVarName: string): Promise<string> {
   if (!paramName) {
-    throw new Error(`SSM parameter name is not configured`);
+    throw new Error(`Environment variable "${envVarName}" is not configured (SSM parameter name is missing)`);
   }
   const res = await ssmClient.send(
     new GetParameterCommand({ Name: paramName, WithDecryption: true })
   );
   const value = res.Parameter?.Value;
   if (!value) {
-    throw new Error(`SSM parameter "${paramName}" returned empty value`);
+    throw new Error(`SSM parameter "${paramName}" (from ${envVarName}) returned empty value`);
   }
   return value;
 }
 
 async function getSecrets(): Promise<{ channelSecret: string; channelAccessToken: string }> {
   if (cachedChannelSecret === undefined) {
-    cachedChannelSecret = await getSSMParameter(LINE_CHANNEL_SECRET_PARAM!);
+    cachedChannelSecret = await getSSMParameter(LINE_CHANNEL_SECRET_PARAM, "LINE_CHANNEL_SECRET_PARAM");
   }
   if (cachedChannelAccessToken === undefined) {
-    cachedChannelAccessToken = await getSSMParameter(LINE_CHANNEL_ACCESS_TOKEN_PARAM!);
+    cachedChannelAccessToken = await getSSMParameter(LINE_CHANNEL_ACCESS_TOKEN_PARAM, "LINE_CHANNEL_ACCESS_TOKEN_PARAM");
   }
   return { channelSecret: cachedChannelSecret, channelAccessToken: cachedChannelAccessToken };
 }
