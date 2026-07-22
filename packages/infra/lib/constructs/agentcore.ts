@@ -21,14 +21,13 @@ export class AgentCoreConstruct extends Construct {
     const artifact = agentcore.AgentRuntimeArtifact.fromCodeAsset({
       path: path.join(__dirname, "../../../agent"),
       runtime: agentcore.AgentCoreRuntime.PYTHON_3_12,
-      entrypoint: ["opentelemetry-instrument", "src/main.py"],
+      entrypoint: ["python", "-m", "src.main"],
     });
 
     this.runtime = new agentcore.Runtime(this, "HomeworkPrintBot", {
       runtimeName: "HomeworkPrintBot",
       agentRuntimeArtifact: artifact,
       environmentVariables: {
-        PARENTS_TABLE: props.tables.parents.tableName,
         CHILDREN_TABLE: props.tables.children.tableName,
         PRINTS_TABLE: props.tables.prints.tableName,
         GRADING_RESULTS_TABLE: props.tables.gradingResults.tableName,
@@ -45,10 +44,11 @@ export class AgentCoreConstruct extends Construct {
       })
     );
 
-    // Grant DynamoDB read/write access
-    Object.values(props.tables).forEach((table) => {
-      table.grantReadWriteData(this.runtime.role);
-    });
+    // Grant DynamoDB read/write access to tables used by the agent
+    props.tables.children.grantReadWriteData(this.runtime.role);
+    props.tables.prints.grantReadWriteData(this.runtime.role);
+    props.tables.gradingResults.grantReadWriteData(this.runtime.role);
+    props.tables.learningStats.grantReadWriteData(this.runtime.role);
 
     // Grant S3 read/write access
     props.bucket.grantReadWrite(this.runtime.role);
