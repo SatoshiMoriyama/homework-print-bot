@@ -1,5 +1,0 @@
-agents:
-  HomeworkPrintBot:
-    entrypoint: src.main:app
-    memory:
-      mode: NO_MEMORY
