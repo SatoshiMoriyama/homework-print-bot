@@ -6,7 +6,7 @@ import base64
 from strands import Agent, tool
 from strands.models.bedrock import BedrockModel
 
-BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "apac.anthropic.claude-sonnet-4-20250514-v1:0")
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "global.anthropic.claude-sonnet-5")
 AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
 
 SYSTEM_PROMPT = """あなたは小学生の回答を採点する先生です。
