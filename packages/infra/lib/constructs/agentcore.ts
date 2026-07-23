@@ -40,7 +40,10 @@ export class AgentCoreConstruct extends Construct {
     // Grant Bedrock model invocation permissions
     this.runtime.role.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel"],
+        actions: [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream",
+        ],
         resources: ["*"],
       })
     );
