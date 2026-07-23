@@ -26,7 +26,7 @@ describe("getPresignedUrl", () => {
     expect(getSignedUrl).toHaveBeenCalledWith(
       expect.any(Object),
       expect.objectContaining({ Bucket: "my-bucket", Key: "prints/test.png" }),
-      { expiresIn: 3600 }
+      { expiresIn: 21600 }
     );
   });
 

@@ -210,13 +210,18 @@ export async function sendPrintImage(userId: string, s3Key: string): Promise<voi
   if (!bucketName) {
     throw new Error('Environment variable "BUCKET_NAME" is not configured');
   }
-  const presignedUrl = await getPresignedUrl(bucketName, s3Key);
-  const client = await getLineClient();
-  await client.pushMessage(userId, {
-    type: "image",
-    originalContentUrl: presignedUrl,
-    previewImageUrl: presignedUrl,
-  });
+  try {
+    const presignedUrl = await getPresignedUrl(bucketName, s3Key);
+    const client = await getLineClient();
+    await client.pushMessage(userId, {
+      type: "image",
+      originalContentUrl: presignedUrl,
+      previewImageUrl: presignedUrl,
+    });
+  } catch (error) {
+    console.error("Failed to send print image", { userId, s3Key, error });
+    throw error;
+  }
 }
 
 const WELCOME_MESSAGE = `ようこそ！しゅくだいプリントBotだよ 📝

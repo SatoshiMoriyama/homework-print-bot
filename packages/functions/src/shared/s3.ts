@@ -3,7 +3,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const s3Client = new S3Client({});
 
-const DEFAULT_EXPIRES_IN = 3600;
+const DEFAULT_EXPIRES_IN = 21600;
 
 export async function getPresignedUrl(bucket: string, key: string, expiresIn: number = DEFAULT_EXPIRES_IN): Promise<string> {
   const command = new GetObjectCommand({
