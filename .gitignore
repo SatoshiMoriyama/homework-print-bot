@@ -37,3 +37,6 @@ cdk.context.json
 
 # Test
 coverage/
+
+# Vendored Python dependencies (built for deployment)
+packages/agent/vendor/
