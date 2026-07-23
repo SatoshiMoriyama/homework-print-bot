@@ -27,5 +27,5 @@
     "pnpm test (should pass with new test)"
   ],
   "blocked_reason": null,
-  "findings": "Environment required mise setup for node@20 + global pnpm@9 install (MISE_NODE_VERIFY=false needed due to gpg-agent not being available). All verification steps passed: pnpm typecheck, pnpm build, pnpm test (2 tests in s3.test.ts)."
+  "findings": "Environment required mise setup for node@20 + global pnpm@9 install (MISE_NODE_VERIFY=false needed due to gpg-agent not being available). All verification steps passed: pnpm typecheck, pnpm build, pnpm test (2 tests in s3.test.ts). Post-review fixes applied: TTL increased to 21600, error handling added to sendPrintImage, handler.test.ts added with 4 tests (6 total tests now pass). Note: handler.ts captures LINE_CHANNEL_SECRET_PARAM and LINE_CHANNEL_ACCESS_TOKEN_PARAM as module-level constants so tests must use vi.hoisted() to set env vars before module load."
 }
