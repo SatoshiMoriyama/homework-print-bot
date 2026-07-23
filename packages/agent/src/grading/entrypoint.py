@@ -4,7 +4,15 @@ import json
 import os
 from datetime import datetime
 import boto3
-from ulid import ULID
+from ulid import ULID as _ULID
+import uuid
+
+def _generate_id() -> str:
+    """Generate a unique ID (fallback to uuid4 if ULID fails)."""
+    try:
+        return str(_ULID())
+    except Exception:
+        return uuid.uuid4().hex
 
 from .agent import grade_from_image, grade_from_text
 
@@ -117,7 +125,7 @@ async def _save_grading_results(
             "input_method": "text" if not image_s3_key else "image",
         })
 
-    result_id = str(ULID())
+    result_id = _generate_id()
     grading_table = dynamodb.Table(GRADING_TABLE)
     grading_table.put_item(
         Item={

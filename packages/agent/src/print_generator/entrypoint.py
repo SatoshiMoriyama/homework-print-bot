@@ -3,7 +3,15 @@
 import json
 import os
 import boto3
-from ulid import ULID
+from ulid import ULID as _ULID
+import uuid
+
+def _generate_id() -> str:
+    """Generate a unique ID (fallback to uuid4 if ULID fails)."""
+    try:
+        return str(_ULID())
+    except Exception:
+        return uuid.uuid4().hex
 
 from .agent import generate_print, regenerate_print
 from .renderer import render_html, render_to_png
@@ -63,7 +71,7 @@ async def handle_generate_print(payload: dict) -> dict:
     png_bytes = await render_to_png(html)
 
     # Upload to S3
-    print_id = str(ULID())
+    print_id = _generate_id()
     s3_key = f"prints/{child_id}/{print_id}.png"
 
     s3_client.put_object(
@@ -79,7 +87,7 @@ async def handle_generate_print(payload: dict) -> dict:
         Item={
             "print_id": print_id,
             "child_id": child_id,
-            "created_at": str(ULID()),  # Use timestamp
+            "created_at": _generate_id(),  # Use timestamp
             "category": params.get("category", ""),
             "subcategory": subcategory,
             "difficulty": difficulty,
@@ -136,7 +144,7 @@ async def handle_regenerate_print(payload: dict) -> dict:
     png_bytes = await render_to_png(html)
 
     # Upload new version
-    new_print_id = str(ULID())
+    new_print_id = _generate_id()
     s3_key = f"prints/{child_id}/{new_print_id}.png"
 
     s3_client.put_object(
@@ -151,7 +159,7 @@ async def handle_regenerate_print(payload: dict) -> dict:
         Item={
             "print_id": new_print_id,
             "child_id": child_id,
-            "created_at": str(ULID()),
+            "created_at": _generate_id(),
             "category": previous_print.get("category", ""),
             "subcategory": subcategory,
             "difficulty": previous_print.get("difficulty", 1),
