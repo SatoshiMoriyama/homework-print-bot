@@ -1,15 +1,19 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { validateSignature, WebhookEvent, TextMessage, Client, MessageAPIResponseBase } from "@line/bot-sdk";
 import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { parseCommand, isModificationInstruction, parseTextAnswers } from "./command-parser";
 import { getUserState, createOrUpdateState, setLastPrintId, clearWaitingState } from "../shared/state";
 import { getParent, createParent, getChildrenByFamily, createChild, findChildByNickname } from "../shared/family";
+import { invokeAgent } from "../shared/agentcore";
 
 const LINE_CHANNEL_SECRET_PARAM = process.env.LINE_CHANNEL_SECRET_PARAM;
 const LINE_CHANNEL_ACCESS_TOKEN_PARAM = process.env.LINE_CHANNEL_ACCESS_TOKEN_PARAM;
+const BUCKET_NAME = process.env.BUCKET_NAME || "";
 
 // SSM client and secret cache (cold start only)
 const ssmClient = new SSMClient({});
+const s3Client = new S3Client({});
 let cachedChannelSecret: string | undefined;
 let cachedChannelAccessToken: string | undefined;
 
@@ -114,9 +118,26 @@ async function handleTextMessage(
   if (state?.waiting_for_text_answer && state.last_print_id) {
     const textAnswers = parseTextAnswers(text);
     if (textAnswers.length > 0) {
-      // TODO: Call Grading Agent with text answers
-      await clearWaitingState(userId);
       await replyText(replyToken, "テキスト回答を受け付けました。採点中...");
+      try {
+        const result = await invokeAgent({
+          action: "grade_text_answer",
+          child_id: state.active_child_id!,
+          print_id: state.last_print_id,
+          text_answers: textAnswers.map((a) => ({ question_number: a.questionNumber, answer_text: a.answerText })),
+        }, userId);
+        await clearWaitingState(userId);
+        if (result.error) {
+          await pushText(userId, `採点エラー: ${result.error}`);
+        } else {
+          const score = result.score as number;
+          const total = result.total as number;
+          await pushText(userId, `採点完了！ ${score}/${total} 問正解 🎉\n\n「プリント」で次の問題を出すよ。`);
+        }
+      } catch (err) {
+        console.error("AgentCore invoke error (grade_text_answer):", err);
+        await pushText(userId, "採点中にエラーが発生しました。もう一度送ってね。");
+      }
       return;
     }
   }
@@ -141,14 +162,57 @@ async function handleTextMessage(
           state.active_child_id = firstChild.child_id;
         }
       }
-      // TODO: Call Print Generator Agent
       await replyText(replyToken, "プリントを作成中... 📝");
+      // Call Print Generator Agent asynchronously
+      try {
+        const result = await invokeAgent({
+          action: "generate_print",
+          child_id: state!.active_child_id!,
+          params: { subcategory: "addition_no_carry", difficulty: 1, question_count: 8 },
+        }, userId);
+        if (result.error) {
+          await pushText(userId, `エラーが発生しました: ${result.error}`);
+        } else {
+          const printId = result.print_id as string;
+          const s3Key = result.s3_key as string;
+          await setLastPrintId(userId, printId);
+          // Send the print image via LINE
+          const imageUrl = `https://${BUCKET_NAME}.s3.ap-northeast-1.amazonaws.com/${s3Key}`;
+          const client = await getLineClient();
+          await client.pushMessage(userId, {
+            type: "image",
+            originalContentUrl: imageUrl,
+            previewImageUrl: imageUrl,
+          });
+        }
+      } catch (err) {
+        console.error("AgentCore invoke error (generate_print):", err);
+        await pushText(userId, "プリント生成中にエラーが発生しました。もう一度試してね。");
+      }
       break;
     }
 
     case "history": {
-      // TODO: Call learning summary
+      if (!state?.active_child_id) {
+        await replyText(replyToken, "まず子供を登録してね！");
+        return;
+      }
       await replyText(replyToken, "学習りれきを取得中...");
+      try {
+        const result = await invokeAgent({
+          action: "get_learning_summary",
+          child_id: state.active_child_id,
+        }, userId);
+        if (result.error) {
+          await pushText(userId, `りれき取得エラー: ${result.error}`);
+        } else {
+          const summary = result.summary as string || JSON.stringify(result, null, 2);
+          await pushText(userId, `📊 学習りれき\n\n${summary}`);
+        }
+      } catch (err) {
+        console.error("AgentCore invoke error (get_learning_summary):", err);
+        await pushText(userId, "りれき取得中にエラーが発生しました。");
+      }
       break;
     }
 
@@ -173,9 +237,33 @@ async function handleTextMessage(
     case "help":
     default: {
       // Check if it's a modification instruction
-      if (state?.last_print_id && isModificationInstruction(text)) {
-        // TODO: Call Print Generator Agent for regeneration
+      if (state?.last_print_id && state.active_child_id && isModificationInstruction(text)) {
         await replyText(replyToken, "プリントを修正中... ✏️");
+        try {
+          const result = await invokeAgent({
+            action: "regenerate_print",
+            child_id: state.active_child_id,
+            print_id: state.last_print_id,
+            modification_instruction: text,
+          }, userId);
+          if (result.error) {
+            await pushText(userId, `修正エラー: ${result.error}`);
+          } else {
+            const printId = result.print_id as string;
+            const s3Key = result.s3_key as string;
+            await setLastPrintId(userId, printId);
+            const imageUrl = `https://${BUCKET_NAME}.s3.ap-northeast-1.amazonaws.com/${s3Key}`;
+            const client = await getLineClient();
+            await client.pushMessage(userId, {
+              type: "image",
+              originalContentUrl: imageUrl,
+              previewImageUrl: imageUrl,
+            });
+          }
+        } catch (err) {
+          console.error("AgentCore invoke error (regenerate_print):", err);
+          await pushText(userId, "プリント修正中にエラーが発生しました。");
+        }
         return;
       }
       await replyText(replyToken, HELP_MESSAGE);
@@ -195,13 +283,71 @@ async function handleImageMessage(
     return;
   }
 
-  // TODO: Download image from LINE, upload to S3, call Grading Agent
+  if (!state.last_print_id) {
+    await replyText(replyToken, "まず「プリント」と送って問題を受け取ってから、回答の写真を送ってね。");
+    return;
+  }
+
   await replyText(replyToken, "回答を採点中... ✅");
+
+  try {
+    // Download image from LINE
+    const client = await getLineClient();
+    const stream = await client.getMessageContent(messageId);
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream as AsyncIterable<Buffer>) {
+      chunks.push(chunk);
+    }
+    const imageBuffer = Buffer.concat(chunks);
+
+    // Upload to S3
+    const s3Key = `answers/${state.active_child_id}/${messageId}.jpg`;
+    await s3Client.send(new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+      Body: imageBuffer,
+      ContentType: "image/jpeg",
+    }));
+
+    // Call Grading Agent
+    const result = await invokeAgent({
+      action: "grade_answer",
+      child_id: state.active_child_id,
+      print_id: state.last_print_id,
+      answer_image_s3_key: s3Key,
+    }, userId);
+
+    if (result.error) {
+      await pushText(userId, `採点エラー: ${result.error}`);
+    } else if (result.status === "partial") {
+      const unreadable = (result.unreadable_questions as number[]) || [];
+      await pushText(userId, `一部読み取れない問題がありました（${unreadable.join(", ")}番）。\nテキストで回答を送ってね。\n例: ①3+5=8 ②2+4=6`);
+      await createOrUpdateState({
+        line_user_id: userId,
+        active_child_id: state.active_child_id,
+        last_print_id: state.last_print_id,
+        waiting_for_text_answer: true,
+        pending_questions: unreadable,
+      });
+    } else {
+      const score = result.score as number;
+      const total = result.total as number;
+      await pushText(userId, `採点完了！ ${score}/${total} 問正解 🎉\n\n「プリント」で次の問題を出すよ。`);
+    }
+  } catch (err) {
+    console.error("AgentCore invoke error (grade_answer):", err);
+    await pushText(userId, "採点中にエラーが発生しました。もう一度写真を送ってね。");
+  }
 }
 
 async function replyText(replyToken: string, text: string): Promise<MessageAPIResponseBase> {
   const client = await getLineClient();
   return client.replyMessage(replyToken, { type: "text", text });
+}
+
+async function pushText(userId: string, text: string): Promise<void> {
+  const client = await getLineClient();
+  await client.pushMessage(userId, { type: "text", text });
 }
 
 const WELCOME_MESSAGE = `ようこそ！しゅくだいプリントBotだよ 📝

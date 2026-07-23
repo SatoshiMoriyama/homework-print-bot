@@ -21,7 +21,7 @@ export class AgentCoreConstruct extends Construct {
     const artifact = agentcore.AgentRuntimeArtifact.fromCodeAsset({
       path: path.join(__dirname, "../../../agent"),
       runtime: agentcore.AgentCoreRuntime.PYTHON_3_12,
-      entrypoint: ["python", "-m", "src.main"],
+      entrypoint: ["entrypoint.py"],
     });
 
     this.runtime = new agentcore.Runtime(this, "HomeworkPrintBot", {
