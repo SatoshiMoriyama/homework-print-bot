@@ -6,7 +6,7 @@ import boto3
 from strands import Agent
 from strands.models.bedrock import BedrockModel
 
-BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-5-v1")
+BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "apac.anthropic.claude-sonnet-4-20250514-v1:0")
 AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
 LEARNING_STATS_TABLE = os.environ.get("LEARNING_STATS_TABLE", "homework-bot-learning-stats")
 CHILDREN_TABLE = os.environ.get("CHILDREN_TABLE", "homework-bot-children")
