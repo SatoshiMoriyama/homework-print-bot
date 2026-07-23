@@ -8,8 +8,8 @@
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "predeploy": "cd packages/agent && uv pip install --target ./vendor --reinstall -r <(uv pip compile pyproject.toml) --python-platform linux --python-version 3.12",
-    "deploy": "pnpm --filter @homework-print-bot/infra cdk deploy",
+    "prebuild:agent": "docker run --rm -v ./packages/agent:/app -w /app --platform linux/arm64 python:3.12-slim pip install --target ./vendor bedrock-agentcore strands-agents boto3 httpx ulid-py",
+    "cdk:deploy": "pnpm run prebuild:agent && pnpm --filter @homework-print-bot/infra cdk deploy",
     "cdk": "pnpm --filter @homework-print-bot/infra cdk"
   },
   "engines": {
