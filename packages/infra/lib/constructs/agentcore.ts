@@ -33,6 +33,7 @@ export class AgentCoreConstruct extends Construct {
         GRADING_RESULTS_TABLE: props.tables.gradingResults.tableName,
         LEARNING_STATS_TABLE: props.tables.learningStats.tableName,
         BUCKET_NAME: props.bucket.bucketName,
+        BEDROCK_MODEL_ID: "apac.anthropic.claude-sonnet-4-20250514-v1:0",
       },
     });
 
