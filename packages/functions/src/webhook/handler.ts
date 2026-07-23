@@ -4,6 +4,7 @@ import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm";
 import { parseCommand, isModificationInstruction, parseTextAnswers } from "./command-parser";
 import { getUserState, createOrUpdateState, setLastPrintId, clearWaitingState } from "../shared/state";
 import { getParent, createParent, getChildrenByFamily, createChild, findChildByNickname } from "../shared/family";
+import { getPresignedUrl } from "../shared/s3";
 
 const LINE_CHANNEL_SECRET_PARAM = process.env.LINE_CHANNEL_SECRET_PARAM;
 const LINE_CHANNEL_ACCESS_TOKEN_PARAM = process.env.LINE_CHANNEL_ACCESS_TOKEN_PARAM;
@@ -202,6 +203,20 @@ async function handleImageMessage(
 async function replyText(replyToken: string, text: string): Promise<MessageAPIResponseBase> {
   const client = await getLineClient();
   return client.replyMessage(replyToken, { type: "text", text });
+}
+
+export async function sendPrintImage(userId: string, s3Key: string): Promise<void> {
+  const bucketName = process.env.BUCKET_NAME;
+  if (!bucketName) {
+    throw new Error('Environment variable "BUCKET_NAME" is not configured');
+  }
+  const presignedUrl = await getPresignedUrl(bucketName, s3Key);
+  const client = await getLineClient();
+  await client.pushMessage(userId, {
+    type: "image",
+    originalContentUrl: presignedUrl,
+    previewImageUrl: presignedUrl,
+  });
 }
 
 const WELCOME_MESSAGE = `ようこそ！しゅくだいプリントBotだよ 📝
