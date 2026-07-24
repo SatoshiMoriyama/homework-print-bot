@@ -11,7 +11,6 @@ try:
     HAS_PLAYWRIGHT = True
 except ImportError:
     HAS_PLAYWRIGHT = False
-    Browser = None
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +182,7 @@ def save_html_to_file(html: str, output_path: str) -> str:
 # Browser lifecycle management
 # ---------------------------------------------------------------------------
 
-_browser: Browser | None = None
+_browser = None
 _playwright_context = None
 _browser_lock = asyncio.Lock()
 
