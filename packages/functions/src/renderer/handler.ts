@@ -1,10 +1,14 @@
 import { S3Event } from "aws-lambda";
 import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
 
 const BUCKET_NAME = process.env.BUCKET_NAME || "";
+const PRINTS_TABLE = process.env.PRINTS_TABLE || "homework-bot-prints";
 const s3Client = new S3Client({});
+const ddbClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
 export async function handler(event: S3Event): Promise<void> {
   for (const record of event.Records) {
@@ -59,6 +63,22 @@ export async function handler(event: S3Event): Promise<void> {
           Key: pngKey,
           Body: pngBuffer,
           ContentType: "image/png",
+        })
+      );
+
+      // Update DynamoDB status to "rendered"
+      // Key format: prints/{child_id}/{print_id}.html
+      const parts = key.split("/");
+      const filename = parts[parts.length - 1];
+      const printId = filename.replace(/\.html$/, "");
+
+      await ddbClient.send(
+        new UpdateCommand({
+          TableName: PRINTS_TABLE,
+          Key: { print_id: printId },
+          UpdateExpression: "SET #status = :status",
+          ExpressionAttributeNames: { "#status": "status" },
+          ExpressionAttributeValues: { ":status": "rendered" },
         })
       );
 

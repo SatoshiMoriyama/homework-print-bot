@@ -1,8 +1,5 @@
 """Print renderer - converts questions JSON to PDF/PNG using HTML templates."""
 
-import json
-import os
-import tempfile
 from pathlib import Path
 
 TEMPLATE = """<!DOCTYPE html>
@@ -167,59 +164,3 @@ def save_html_to_file(html: str, output_path: str) -> str:
     with open(output_path, "w", encoding="utf-8") as f:
         f.write(html)
     return output_path
-
-
-async def render_to_pdf(html: str) -> bytes:
-    """Render HTML to PDF using Puppeteer/Playwright.
-
-    Note: In production, this would use Puppeteer with chromium-min in a Lambda Layer.
-    For now, returns HTML bytes as a placeholder.
-
-    Args:
-        html: The rendered HTML string
-
-    Returns:
-        PDF bytes.
-    """
-    # In production, this would use:
-    # from playwright.async_api import async_playwright
-    # async with async_playwright() as p:
-    #     browser = await p.chromium.launch()
-    #     page = await browser.new_page()
-    #     await page.set_content(html)
-    #     pdf_bytes = await page.pdf(format='A4')
-    #     await browser.close()
-    #     return pdf_bytes
-
-    # Placeholder: return HTML as bytes
-    return html.encode("utf-8")
-
-
-async def render_to_png(html: str) -> bytes:
-    """Render HTML to PNG using Puppeteer/Playwright.
-
-    Note: In production, this would use Puppeteer with chromium-min in a Lambda Layer.
-    For now, returns empty bytes as a placeholder.
-
-    Args:
-        html: The rendered HTML string
-
-    Returns:
-        PNG bytes.
-    """
-    # In production, this would use:
-    # from playwright.async_api import async_playwright
-    # async with async_playwright() as p:
-    #     browser = await p.chromium.launch()
-    #     page = await browser.new_page()
-    #     await page.set_viewport_size({"width": 794, "height": 1123})  # A4 at 96dpi
-    #     await page.set_content(html)
-    #     png_bytes = await page.screenshot(full_page=True)
-    #     await browser.close()
-    #     return png_bytes
-
-    # TODO: This is a placeholder that returns UTF-8 encoded HTML, NOT a valid PNG.
-    # Downstream code uploads this as ContentType=image/png, which will be invalid.
-    # This will NOT produce a valid PNG until Puppeteer/Playwright is integrated.
-    # Placeholder
-    return html.encode("utf-8")

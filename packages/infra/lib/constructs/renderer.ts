@@ -1,4 +1,5 @@
 import * as cdk from "aws-cdk-lib";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as nodejs from "aws-cdk-lib/aws-lambda-nodejs";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -8,6 +9,7 @@ import { Construct } from "constructs";
 
 export interface RendererConstructProps {
   bucket: s3.Bucket;
+  printsTable: dynamodb.Table;
 }
 
 export class RendererConstruct extends Construct {
@@ -25,15 +27,19 @@ export class RendererConstruct extends Construct {
       memorySize: 2048,
       environment: {
         BUCKET_NAME: props.bucket.bucketName,
+        PRINTS_TABLE: props.printsTable.tableName,
       },
       bundling: {
         minify: true,
-        sourceMap: true,
+        sourceMap: false,
       },
     });
 
     // Grant S3 read/write permissions
     props.bucket.grantReadWrite(this.rendererHandler);
+
+    // Grant DynamoDB write permissions for status updates
+    props.printsTable.grantWriteData(this.rendererHandler);
 
     // Add S3 event notification for .html files in prints/ prefix
     props.bucket.addEventNotification(

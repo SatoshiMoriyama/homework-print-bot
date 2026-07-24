@@ -63,16 +63,17 @@ async def handle_generate_print(payload: dict) -> dict:
 
     # Upload HTML to S3 (Lambda will render to PNG)
     print_id = str(ULID())
-    s3_key = f"prints/{child_id}/{print_id}.html"
+    html_key = f"prints/{child_id}/{print_id}.html"
+    png_key = f"prints/{child_id}/{print_id}.png"
 
     s3_client.put_object(
         Bucket=S3_BUCKET,
-        Key=s3_key,
+        Key=html_key,
         Body=html.encode("utf-8"),
         ContentType="text/html",
     )
 
-    # Save to DynamoDB
+    # Save to DynamoDB with the PNG key (eventual consistency - PNG is produced async)
     table = dynamodb.Table(PRINTS_TABLE)
     table.put_item(
         Item={
@@ -83,14 +84,14 @@ async def handle_generate_print(payload: dict) -> dict:
             "subcategory": subcategory,
             "difficulty": difficulty,
             "questions": questions,
-            "s3_key": s3_key,
-            "status": "generated",
+            "s3_key": png_key,
+            "status": "rendering",
         }
     )
 
     return {
         "print_id": print_id,
-        "s3_key": s3_key,
+        "s3_key": png_key,
         "questions": questions,
         "unit_label": unit_label,
     }
@@ -135,16 +136,17 @@ async def handle_regenerate_print(payload: dict) -> dict:
 
     # Upload HTML to S3 (Lambda will render to PNG)
     new_print_id = str(ULID())
-    s3_key = f"prints/{child_id}/{new_print_id}.html"
+    html_key = f"prints/{child_id}/{new_print_id}.html"
+    png_key = f"prints/{child_id}/{new_print_id}.png"
 
     s3_client.put_object(
         Bucket=S3_BUCKET,
-        Key=s3_key,
+        Key=html_key,
         Body=html.encode("utf-8"),
         ContentType="text/html",
     )
 
-    # Save to DynamoDB
+    # Save to DynamoDB with the PNG key (eventual consistency - PNG is produced async)
     table.put_item(
         Item={
             "print_id": new_print_id,
@@ -154,14 +156,14 @@ async def handle_regenerate_print(payload: dict) -> dict:
             "subcategory": subcategory,
             "difficulty": previous_print.get("difficulty", 1),
             "questions": questions,
-            "s3_key": s3_key,
-            "status": "generated",
+            "s3_key": png_key,
+            "status": "rendering",
         }
     )
 
     return {
         "print_id": new_print_id,
-        "s3_key": s3_key,
+        "s3_key": png_key,
         "questions": questions,
         "unit_label": unit_label,
     }

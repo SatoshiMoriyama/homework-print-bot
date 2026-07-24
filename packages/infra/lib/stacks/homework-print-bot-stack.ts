@@ -15,6 +15,7 @@ export class HomeworkPrintBotStack extends cdk.Stack {
     const s3 = new S3Construct(this, "S3");
     new RendererConstruct(this, "Renderer", {
       bucket: s3.bucket,
+      printsTable: dynamodb.tables.prints,
     });
     const api = new ApiConstruct(this, "Api", {
       tables: dynamodb.tables,
