@@ -7,7 +7,6 @@
 import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 
 const lambdaClient = new LambdaClient({});
-const RENDERER_FUNCTION_NAME = process.env.RENDERER_FUNCTION_NAME || "";
 
 export interface InvokeRendererParams {
   s3Key: string;
@@ -22,12 +21,13 @@ export interface RendererResult {
  * Invoke the renderer Lambda synchronously to convert an HTML file in S3 to PNG.
  */
 export async function invokeRenderer(params: InvokeRendererParams): Promise<RendererResult> {
-  if (!RENDERER_FUNCTION_NAME) {
+  const functionName = process.env.RENDERER_FUNCTION_NAME || "";
+  if (!functionName) {
     throw new Error("RENDERER_FUNCTION_NAME environment variable is not configured");
   }
 
   const command = new InvokeCommand({
-    FunctionName: RENDERER_FUNCTION_NAME,
+    FunctionName: functionName,
     InvocationType: "RequestResponse",
     Payload: new TextEncoder().encode(JSON.stringify(params)),
   });

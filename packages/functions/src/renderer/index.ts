@@ -30,6 +30,9 @@ export async function handler(event: RendererEvent): Promise<RendererResponse> {
   if (!s3Key) {
     throw new Error("s3Key is required in the event");
   }
+  if (!s3Key.endsWith(".html")) {
+    throw new Error(`s3Key must have .html extension, got: ${s3Key}`);
+  }
 
   // Download HTML from S3
   const getCommand = new GetObjectCommand({
@@ -37,7 +40,10 @@ export async function handler(event: RendererEvent): Promise<RendererResponse> {
     Key: s3Key,
   });
   const getResponse = await s3Client.send(getCommand);
-  const html = await getResponse.Body!.transformToString("utf-8");
+  if (!getResponse.Body) {
+    throw new Error(`S3 GetObject returned no Body for key: ${s3Key}`);
+  }
+  const html = await getResponse.Body.transformToString("utf-8");
 
   // Launch browser with @sparticuz/chromium
   const browser = await puppeteer.launch({
