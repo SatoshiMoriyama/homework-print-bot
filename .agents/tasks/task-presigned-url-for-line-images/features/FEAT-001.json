@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add S3 presigned URL generation utility and integrate it into the webhook handler so that print images sent to LINE use temporary signed URLs instead of direct S3 URLs.",
+  "status": "completed",
+  "steps": [
+    "Add @aws-sdk/s3-request-presigner to packages/functions/package.json dependencies",
+    "Run pnpm install from workspace root to update lockfile",
+    "Create a new shared utility file packages/functions/src/shared/s3.ts that: (a) imports S3Client and GetObjectCommand from @aws-sdk/client-s3, (b) imports getSignedUrl from @aws-sdk/s3-request-presigner, (c) creates and exports a cached S3Client instance, (d) exports a function getPresignedUrl(bucket: string, key: string, expiresIn?: number) that generates a presigned URL with default 6-hour (21600 seconds) expiry",
+    "In packages/functions/src/webhook/handler.ts, import the new getPresignedUrl function from '../shared/s3' and export a helper function sendPrintImage(userId: string, s3Key: string) that: (a) reads BUCKET_NAME from process.env, (b) calls getPresignedUrl to generate a presigned URL for the given s3Key, (c) uses the LINE client (via getLineClient()) to call pushMessage with an image message where both originalContentUrl and previewImageUrl use the presigned URL",
+    "Add a unit test file packages/functions/src/shared/s3.test.ts that tests the getPresignedUrl function by mocking @aws-sdk/s3-request-presigner's getSignedUrl and verifying it is called with correct parameters (bucket, key, expiresIn defaults to 21600)",
+    "Run pnpm typecheck to verify the code compiles without errors",
+    "Run pnpm test to verify the test passes"
+  ],
+  "acceptance_criteria": [
+    "@aws-sdk/s3-request-presigner is added to packages/functions/package.json",
+    "packages/functions/src/shared/s3.ts exports getPresignedUrl(bucket, key, expiresIn?) function",
+    "packages/functions/src/webhook/handler.ts exports sendPrintImage(userId, s3Key) function that generates a presigned URL and sends it via LINE pushMessage as an image message",
+    "Unit test in packages/functions/src/shared/s3.test.ts passes",
+    "pnpm typecheck passes with no errors",
+    "pnpm build passes with no errors"
+  ],
+  "verification": [
+    "pnpm install (should succeed with new dependency)",
+    "pnpm typecheck (should pass)",
+    "pnpm build (should pass)",
+    "pnpm test (should pass with new test)"
+  ],
+  "blocked_reason": null,
+  "findings": "Environment required mise setup for node@20 + global pnpm@9 install (MISE_NODE_VERIFY=false needed due to gpg-agent not being available). All verification steps passed: pnpm typecheck, pnpm build, pnpm test (2 tests in s3.test.ts). Post-review fixes applied: TTL increased to 21600, error handling added to sendPrintImage, handler.test.ts added with 4 tests (6 total tests now pass). Note: handler.ts captures LINE_CHANNEL_SECRET_PARAM and LINE_CHANNEL_ACCESS_TOKEN_PARAM as module-level constants so tests must use vi.hoisted() to set env vars before module load."
+}

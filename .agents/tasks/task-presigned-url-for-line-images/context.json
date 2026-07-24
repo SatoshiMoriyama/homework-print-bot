@@ -1,0 +1,22 @@
+{
+  "project_type": "Monorepo (pnpm workspace) - LINE Webhook Lambda handlers (TypeScript / Node.js 20), Bedrock AgentCore (Python 3.12), AWS CDK infra (TypeScript)",
+  "language": "TypeScript (functions & infra), Python (agent)",
+  "build_system": "pnpm workspaces, tsc for TypeScript compilation",
+  "test_framework": "vitest (configured in functions package.json but no test files exist yet)",
+  "build_command": "pnpm build",
+  "test_command": "pnpm test",
+  "verification_instructions": "1. pnpm install 2. pnpm typecheck 3. pnpm build 4. pnpm test (if test files exist)",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "pnpm install",
+  "environment_constraints": "OPEN_INTERNET - full network access available. No Docker daemon needed for this task.",
+  "contribution_requirements": "CI runs pnpm typecheck on PRs. Must pass TypeScript type checking.",
+  "key_patterns": "- Shared utilities live in packages/functions/src/shared/ - Handler in packages/functions/src/webhook/handler.ts - AWS SDK clients instantiated at module top-level with caching pattern - Environment variables passed from CDK via Lambda environment - S3 bucket name via BUCKET_NAME env var - CDK constructs in packages/infra/lib/constructs/ grant permissions to Lambda",
+  "relevant_files": [
+    "packages/functions/src/webhook/handler.ts",
+    "packages/functions/package.json",
+    "packages/functions/src/shared/",
+    "packages/infra/lib/constructs/api.ts",
+    "packages/infra/lib/constructs/s3.ts"
+  ],
+  "directory_structure": "packages/functions/src/webhook/ - Lambda handlers, packages/functions/src/shared/ - shared utilities, packages/infra/lib/constructs/ - CDK constructs, packages/infra/lib/stacks/ - CDK stacks"
+}
