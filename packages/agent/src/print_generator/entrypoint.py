@@ -5,6 +5,7 @@ import os
 import boto3
 from ulid import ULID as _ULID
 import uuid
+from typing import Tuple
 
 def _generate_id() -> str:
     """Generate a unique ID (fallback to uuid4 if ULID fails)."""
@@ -21,6 +22,22 @@ PRINTS_TABLE = os.environ.get("PRINTS_TABLE", "homework-bot-prints")
 
 s3_client = boto3.client("s3", region_name="ap-northeast-1")
 dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
+
+
+def _detect_content_type(data: bytes) -> Tuple[bytes, str, str, bool]:
+    """Detect whether rendered output is HTML (needs further rendering) or PNG.
+
+    Returns:
+        Tuple of (body, extension, content_type, needs_rendering)
+    """
+    try:
+        decoded = data.decode("utf-8")
+        stripped = decoded.strip()
+        if stripped.startswith("<!DOCTYPE html>") or stripped.startswith("<html"):
+            return (data, ".html", "text/html", True)
+        return (data, ".png", "image/png", False)
+    except (UnicodeDecodeError, AttributeError):
+        return (data, ".png", "image/png", False)
 
 
 async def handle_generate_print(payload: dict) -> dict:
@@ -72,26 +89,10 @@ async def handle_generate_print(payload: dict) -> dict:
 
     # Determine if Playwright was available (render_to_png returns HTML bytes as fallback)
     print_id = _generate_id()
-    needs_rendering = False
 
-    # If png_bytes is actually HTML (Playwright was not available), save as .html
-    try:
-        html_decoded = png_bytes.decode("utf-8")
-        if html_decoded.strip().startswith("<!DOCTYPE html>") or html_decoded.strip().startswith("<html"):
-            # Playwright was not available, save as HTML
-            needs_rendering = True
-            s3_key = f"prints/{child_id}/{print_id}.html"
-            content_type = "text/html"
-            body = png_bytes
-        else:
-            s3_key = f"prints/{child_id}/{print_id}.png"
-            content_type = "image/png"
-            body = png_bytes
-    except (UnicodeDecodeError, AttributeError):
-        # Binary PNG data
-        s3_key = f"prints/{child_id}/{print_id}.png"
-        content_type = "image/png"
-        body = png_bytes
+    # Detect content type and determine if rendering is needed
+    body, ext, content_type, needs_rendering = _detect_content_type(png_bytes)
+    s3_key = f"prints/{child_id}/{print_id}{ext}"
 
     # Upload to S3
     s3_client.put_object(
@@ -169,26 +170,10 @@ async def handle_regenerate_print(payload: dict) -> dict:
 
     # Determine if Playwright was available (render_to_png returns HTML bytes as fallback)
     new_print_id = _generate_id()
-    needs_rendering = False
 
-    # If png_bytes is actually HTML (Playwright was not available), save as .html
-    try:
-        html_decoded = png_bytes.decode("utf-8")
-        if html_decoded.strip().startswith("<!DOCTYPE html>") or html_decoded.strip().startswith("<html"):
-            # Playwright was not available, save as HTML
-            needs_rendering = True
-            s3_key = f"prints/{child_id}/{new_print_id}.html"
-            content_type = "text/html"
-            body = png_bytes
-        else:
-            s3_key = f"prints/{child_id}/{new_print_id}.png"
-            content_type = "image/png"
-            body = png_bytes
-    except (UnicodeDecodeError, AttributeError):
-        # Binary PNG data
-        s3_key = f"prints/{child_id}/{new_print_id}.png"
-        content_type = "image/png"
-        body = png_bytes
+    # Detect content type and determine if rendering is needed
+    body, ext, content_type, needs_rendering = _detect_content_type(png_bytes)
+    s3_key = f"prints/{child_id}/{new_print_id}{ext}"
 
     # Upload to S3
     s3_client.put_object(

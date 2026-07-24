@@ -28,6 +28,7 @@ export class RendererConstruct extends Construct {
       bundling: {
         minify: true,
         sourceMap: true,
+        nodeModules: ["@sparticuz/chromium", "puppeteer-core"],
       },
     });
 

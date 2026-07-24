@@ -11,8 +11,6 @@ import { invokeRenderer } from "../shared/renderer";
 
 const LINE_CHANNEL_SECRET_PARAM = process.env.LINE_CHANNEL_SECRET_PARAM;
 const LINE_CHANNEL_ACCESS_TOKEN_PARAM = process.env.LINE_CHANNEL_ACCESS_TOKEN_PARAM;
-const BUCKET_NAME = process.env.BUCKET_NAME || "";
-
 // SSM client and secret cache (cold start only)
 const ssmClient = new SSMClient({});
 const s3Client = new S3Client({});
@@ -180,7 +178,7 @@ async function handleTextMessage(
           await setLastPrintId(userId, printId);
           // If the agent returned HTML (needs rendering), invoke the renderer Lambda
           if (result.needs_rendering) {
-            const rendered = await invokeRenderer({ s3Key, bucketName: BUCKET_NAME });
+            const rendered = await invokeRenderer({ s3Key, bucketName: process.env.BUCKET_NAME || "" });
             s3Key = rendered.pngS3Key;
           }
           await sendPrintImage(userId, s3Key);
@@ -254,7 +252,7 @@ async function handleTextMessage(
             await setLastPrintId(userId, printId);
             // If the agent returned HTML (needs rendering), invoke the renderer Lambda
             if (result.needs_rendering) {
-              const rendered = await invokeRenderer({ s3Key, bucketName: BUCKET_NAME });
+              const rendered = await invokeRenderer({ s3Key, bucketName: process.env.BUCKET_NAME || "" });
               s3Key = rendered.pngS3Key;
             }
             await sendPrintImage(userId, s3Key);
@@ -302,7 +300,7 @@ async function handleImageMessage(
     // Upload to S3
     const s3Key = `answers/${state.active_child_id}/${messageId}.jpg`;
     await s3Client.send(new PutObjectCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: process.env.BUCKET_NAME || "",
       Key: s3Key,
       Body: imageBuffer,
       ContentType: "image/jpeg",

@@ -50,7 +50,7 @@ export async function handler(event: RendererEvent): Promise<RendererResponse> {
   let pngBuffer: Buffer;
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
     const screenshot = await page.screenshot({ fullPage: true });
     pngBuffer = Buffer.from(screenshot);
     await page.close();

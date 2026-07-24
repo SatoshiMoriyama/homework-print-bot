@@ -86,7 +86,7 @@ describe("renderer handler", () => {
       executablePath: "/tmp/chromium",
       headless: true,
     });
-    expect(mockSetContent).toHaveBeenCalledWith(htmlContent, { waitUntil: "networkidle0" });
+    expect(mockSetContent).toHaveBeenCalledWith(htmlContent, { waitUntil: "domcontentloaded" });
     expect(mockScreenshot).toHaveBeenCalledWith({ fullPage: true });
     expect(mockPageClose).toHaveBeenCalled();
     expect(mockBrowserClose).toHaveBeenCalled();
