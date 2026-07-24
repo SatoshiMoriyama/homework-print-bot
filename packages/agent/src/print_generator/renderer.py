@@ -3,6 +3,7 @@
 import asyncio
 import atexit
 import logging
+import sys
 from pathlib import Path
 
 from playwright.async_api import Browser, async_playwright
@@ -186,18 +187,30 @@ async def _ensure_chromium_installed() -> None:
     """Ensure Chromium is installed for Playwright. Attempts installation if missing.
 
     Uses asyncio.create_subprocess_exec to avoid blocking the event loop.
+    First tries with --with-deps; falls back to without if that fails.
     """
     try:
         proc = await asyncio.create_subprocess_exec(
-            "python", "-m", "playwright", "install", "chromium", "--with-deps",
+            sys.executable, "-m", "playwright", "install", "chromium", "--with-deps",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
         if proc.returncode != 0:
-            raise RuntimeError(
-                f"Failed to install Chromium via playwright install: {stderr.decode()}"
+            logger.warning(
+                "Chromium install with --with-deps failed, retrying without: %s",
+                stderr.decode(),
             )
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", "playwright", "install", "chromium",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+            if proc.returncode != 0:
+                raise RuntimeError(
+                    f"Failed to install Chromium via playwright install: {stderr.decode()}"
+                )
         logger.info("Chromium installed successfully")
     except FileNotFoundError as e:
         raise RuntimeError(
@@ -279,14 +292,16 @@ async def shutdown_browser() -> None:
 def _atexit_shutdown() -> None:
     """atexit handler that schedules browser shutdown."""
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            loop.create_task(shutdown_browser())
-        else:
-            loop.run_until_complete(shutdown_browser())
+        loop = asyncio.get_running_loop()
+        # Loop is currently running — schedule cleanup as a task
+        loop.create_task(shutdown_browser())
     except RuntimeError:
-        # No event loop available; nothing to clean up
-        pass
+        # No running loop — create a temporary one for cleanup
+        try:
+            asyncio.run(shutdown_browser())
+        except Exception:
+            # Interpreter is shutting down; nothing to clean up
+            pass
 
 
 atexit.register(_atexit_shutdown)
