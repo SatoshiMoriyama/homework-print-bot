@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Implement render_to_png and render_to_pdf in renderer.py using Playwright to produce valid PNG/PDF output from the HTML template. Add playwright dependency to pyproject.toml. Include browser lifecycle management with lazy initialization and proper cleanup.",
+  "status": "in_progress",
+  "steps": [
+    "Add 'playwright>=1.48.0' to the dependencies list in packages/agent/pyproject.toml",
+    "In packages/agent/src/print_generator/renderer.py, implement render_to_png using Playwright's async API: launch Chromium with headless mode, set viewport to A4 at 96dpi (794x1123), set content with wait_until='networkidle' (to load Google Fonts), take a full-page screenshot, close browser, return PNG bytes",
+    "In packages/agent/src/print_generator/renderer.py, implement render_to_pdf using Playwright's async API: launch Chromium, set content with wait_until='networkidle', generate PDF with format='A4', close browser, return PDF bytes",
+    "Add browser lifecycle management: use a module-level approach to launch browser once and reuse across calls for performance in the AgentCore container. Include proper error handling and a helper function _get_browser() that handles lazy initialization and ensures Chromium is installed (calling playwright install chromium if needed via subprocess).",
+    "Ensure the HTML content is loaded with sufficient wait time for Google Fonts to download (use wait_until='networkidle' or explicit wait for fonts)",
+    "Keep the existing function signatures intact: async def render_to_png(html: str) -> bytes and async def render_to_pdf(html: str) -> bytes",
+    "Add proper error handling: if Playwright/Chromium is not available, raise a clear RuntimeError with instructions"
+  ],
+  "acceptance_criteria": [
+    "render_to_png returns bytes that start with the PNG magic bytes (\\x89PNG\\r\\n\\x1a\\n)",
+    "render_to_pdf returns bytes that start with the PDF magic bytes (%PDF-)",
+    "Existing render_html function is unchanged",
+    "pyproject.toml includes playwright in dependencies",
+    "Code passes ruff lint (line-length=120, target-version=py312)",
+    "Function signatures remain async def render_to_png(html: str) -> bytes and async def render_to_pdf(html: str) -> bytes"
+  ],
+  "verification": [
+    "cd packages/agent && uv sync",
+    "cd packages/agent && uv run playwright install chromium --with-deps",
+    "cd packages/agent && uv run python -c \"import asyncio; from src.print_generator.renderer import render_html, render_to_png; html = render_html([{'number': 1, 'text': '1+1='}], 'テスト'); png = asyncio.run(render_to_png(html)); assert png[:8] == b'\\x89PNG\\r\\n\\x1a\\n', f'Not valid PNG: {png[:8]}'; print(f'PNG OK: {len(png)} bytes')\"",
+    "cd packages/agent && uv run ruff check src/"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
