@@ -179,136 +179,107 @@ def save_html_to_file(html: str, output_path: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Browser lifecycle management
+# Browser lifecycle management (only when Playwright is available)
 # ---------------------------------------------------------------------------
 
-_browser = None
-_playwright_context = None
-_browser_lock = asyncio.Lock()
+if HAS_PLAYWRIGHT:
+    _browser = None
+    _playwright_context = None
+    _browser_lock = asyncio.Lock()
 
-
-async def _ensure_chromium_installed() -> None:
-    """Ensure Chromium is installed for Playwright. Attempts installation if missing.
-
-    Uses asyncio.create_subprocess_exec to avoid blocking the event loop.
-    First tries with --with-deps; falls back to without if that fails.
-    """
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            sys.executable, "-m", "playwright", "install", "chromium", "--with-deps",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
-        if proc.returncode != 0:
-            logger.warning(
-                "Chromium install with --with-deps failed, retrying without: %s",
-                stderr.decode(),
-            )
+    async def _ensure_chromium_installed() -> None:
+        """Ensure Chromium is installed for Playwright."""
+        try:
             proc = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", "playwright", "install", "chromium",
+                sys.executable, "-m", "playwright", "install", "chromium", "--with-deps",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
             if proc.returncode != 0:
-                raise RuntimeError(
-                    f"Failed to install Chromium via playwright install: {stderr.decode()}"
+                logger.warning(
+                    "Chromium install with --with-deps failed, retrying without: %s",
+                    stderr.decode(),
                 )
-        logger.info("Chromium installed successfully")
-    except FileNotFoundError as e:
-        raise RuntimeError(
-            "Playwright is not available. Install it with: pip install playwright"
-        ) from e
-    except TimeoutError as e:
-        raise RuntimeError(
-            "Chromium installation timed out after 300 seconds"
-        ) from e
+                proc = await asyncio.create_subprocess_exec(
+                    sys.executable, "-m", "playwright", "install", "chromium",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+                if proc.returncode != 0:
+                    raise RuntimeError(
+                        f"Failed to install Chromium via playwright install: {stderr.decode()}"
+                    )
+            logger.info("Chromium installed successfully")
+        except FileNotFoundError as e:
+            raise RuntimeError(
+                "Playwright is not available. Install it with: pip install playwright"
+            ) from e
+        except TimeoutError as e:
+            raise RuntimeError(
+                "Chromium installation timed out after 300 seconds"
+            ) from e
 
+    async def _get_browser():
+        """Get or create a shared browser instance (lazy initialization)."""
+        global _browser, _playwright_context
 
-async def _get_browser() -> Browser:
-    """Get or create a shared browser instance (lazy initialization).
-
-    Launches Chromium on first call and reuses the instance for subsequent calls.
-    If Chromium is not installed, attempts to install it via subprocess.
-    Uses an asyncio.Lock to prevent concurrent initialization attempts.
-
-    Returns:
-        A Playwright Browser instance.
-
-    Raises:
-        RuntimeError: If Chromium cannot be launched or installed.
-    """
-    global _browser, _playwright_context
-
-    if _browser is not None and _browser.is_connected():
-        return _browser
-
-    async with _browser_lock:
-        # Double-check after acquiring lock
         if _browser is not None and _browser.is_connected():
             return _browser
 
-        if _playwright_context is None:
-            pw = async_playwright()
-            _playwright_context = await pw.start()
+        async with _browser_lock:
+            if _browser is not None and _browser.is_connected():
+                return _browser
 
-        try:
-            _browser = await _playwright_context.chromium.launch(headless=True)
-        except Exception as first_error:
-            logger.warning("Chromium launch failed, attempting to install: %s", first_error)
-            await _ensure_chromium_installed()
+            if _playwright_context is None:
+                pw = async_playwright()
+                _playwright_context = await pw.start()
+
             try:
                 _browser = await _playwright_context.chromium.launch(headless=True)
-            except Exception as second_error:
-                raise RuntimeError(
-                    "Failed to launch Chromium even after installation attempt. "
-                    "Ensure Playwright and Chromium are properly installed: "
-                    "pip install playwright && python -m playwright install chromium --with-deps"
-                ) from second_error
+            except Exception as first_error:
+                logger.warning("Chromium launch failed, attempting to install: %s", first_error)
+                await _ensure_chromium_installed()
+                try:
+                    _browser = await _playwright_context.chromium.launch(headless=True)
+                except Exception as second_error:
+                    raise RuntimeError(
+                        "Failed to launch Chromium even after installation attempt."
+                    ) from second_error
 
-    return _browser
+        return _browser
 
+    async def shutdown_browser() -> None:
+        """Shut down the shared browser instance."""
+        global _browser, _playwright_context
 
-async def shutdown_browser() -> None:
-    """Shut down the shared browser instance and stop the Playwright context.
+        if _browser is not None:
+            try:
+                await _browser.close()
+            except Exception:
+                logger.warning("Error closing browser during shutdown", exc_info=True)
+            _browser = None
 
-    Call this to cleanly release browser resources at process exit or when
-    the browser is no longer needed.
-    """
-    global _browser, _playwright_context
+        if _playwright_context is not None:
+            try:
+                await _playwright_context.stop()
+            except Exception:
+                logger.warning("Error stopping Playwright context during shutdown", exc_info=True)
+            _playwright_context = None
 
-    if _browser is not None:
+    def _atexit_shutdown() -> None:
+        """atexit handler that schedules browser shutdown."""
         try:
-            await _browser.close()
-        except Exception:
-            logger.warning("Error closing browser during shutdown", exc_info=True)
-        _browser = None
+            loop = asyncio.get_running_loop()
+            loop.create_task(shutdown_browser())
+        except RuntimeError:
+            try:
+                asyncio.run(shutdown_browser())
+            except Exception:
+                pass
 
-    if _playwright_context is not None:
-        try:
-            await _playwright_context.stop()
-        except Exception:
-            logger.warning("Error stopping Playwright context during shutdown", exc_info=True)
-        _playwright_context = None
-
-
-def _atexit_shutdown() -> None:
-    """atexit handler that schedules browser shutdown."""
-    try:
-        loop = asyncio.get_running_loop()
-        # Loop is currently running — schedule cleanup as a task
-        loop.create_task(shutdown_browser())
-    except RuntimeError:
-        # No running loop — create a temporary one for cleanup
-        try:
-            asyncio.run(shutdown_browser())
-        except Exception:
-            # Interpreter is shutting down; nothing to clean up
-            pass
-
-
-atexit.register(_atexit_shutdown)
+    atexit.register(_atexit_shutdown)
 
 
 async def render_to_pdf(html: str) -> bytes:
