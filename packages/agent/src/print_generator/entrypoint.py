@@ -5,6 +5,7 @@ import os
 import boto3
 from ulid import ULID as _ULID
 import uuid
+from typing import Tuple
 
 def _generate_id() -> str:
     """Generate a unique ID (fallback to uuid4 if ULID fails)."""
@@ -21,6 +22,22 @@ PRINTS_TABLE = os.environ.get("PRINTS_TABLE", "homework-bot-prints")
 
 s3_client = boto3.client("s3", region_name="ap-northeast-1")
 dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
+
+
+def _detect_content_type(data: bytes) -> Tuple[bytes, str, str, bool]:
+    """Detect whether rendered output is HTML (needs further rendering) or PNG.
+
+    Returns:
+        Tuple of (body, extension, content_type, needs_rendering)
+    """
+    try:
+        decoded = data.decode("utf-8")
+        stripped = decoded.strip()
+        if stripped.startswith("<!DOCTYPE html>") or stripped.startswith("<html"):
+            return (data, ".html", "text/html", True)
+        return (data, ".png", "image/png", False)
+    except (UnicodeDecodeError, AttributeError):
+        return (data, ".png", "image/png", False)
 
 
 async def handle_generate_print(payload: dict) -> dict:
@@ -70,15 +87,19 @@ async def handle_generate_print(payload: dict) -> dict:
     html = render_html(questions, unit_label)
     png_bytes = await render_to_png(html)
 
-    # Upload to S3
+    # Determine if Playwright was available (render_to_png returns HTML bytes as fallback)
     print_id = _generate_id()
-    s3_key = f"prints/{child_id}/{print_id}.png"
 
+    # Detect content type and determine if rendering is needed
+    body, ext, content_type, needs_rendering = _detect_content_type(png_bytes)
+    s3_key = f"prints/{child_id}/{print_id}{ext}"
+
+    # Upload to S3
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=s3_key,
-        Body=png_bytes,
-        ContentType="image/png",
+        Body=body,
+        ContentType=content_type,
     )
 
     # Save to DynamoDB
@@ -97,12 +118,16 @@ async def handle_generate_print(payload: dict) -> dict:
         }
     )
 
-    return {
+    response = {
         "print_id": print_id,
         "s3_key": s3_key,
         "questions": questions,
         "unit_label": unit_label,
     }
+    if needs_rendering:
+        response["needs_rendering"] = True
+
+    return response
 
 
 async def handle_regenerate_print(payload: dict) -> dict:
@@ -143,15 +168,19 @@ async def handle_regenerate_print(payload: dict) -> dict:
     html = render_html(questions, unit_label)
     png_bytes = await render_to_png(html)
 
-    # Upload new version
+    # Determine if Playwright was available (render_to_png returns HTML bytes as fallback)
     new_print_id = _generate_id()
-    s3_key = f"prints/{child_id}/{new_print_id}.png"
 
+    # Detect content type and determine if rendering is needed
+    body, ext, content_type, needs_rendering = _detect_content_type(png_bytes)
+    s3_key = f"prints/{child_id}/{new_print_id}{ext}"
+
+    # Upload to S3
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=s3_key,
-        Body=png_bytes,
-        ContentType="image/png",
+        Body=body,
+        ContentType=content_type,
     )
 
     # Save to DynamoDB
@@ -169,12 +198,16 @@ async def handle_regenerate_print(payload: dict) -> dict:
         }
     )
 
-    return {
+    response_data = {
         "print_id": new_print_id,
         "s3_key": s3_key,
         "questions": questions,
         "unit_label": unit_label,
     }
+    if needs_rendering:
+        response_data["needs_rendering"] = True
+
+    return response_data
 
 
 def _get_unit_label(subcategory: str) -> str:

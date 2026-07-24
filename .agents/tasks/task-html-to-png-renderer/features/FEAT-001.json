@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Create the html-to-png renderer Lambda function in packages/functions/src/renderer/ using puppeteer-core and @sparticuz/chromium, plus its CDK construct in packages/infra/lib/constructs/renderer.ts, and integrate it into the stack and webhook handler flow.",
+  "status": "completed",
+  "steps": [
+    "Step 1: Add puppeteer-core and @sparticuz/chromium as dependencies to packages/functions/package.json. Add @aws-sdk/client-lambda as a dependency (needed for invoking the renderer Lambda from webhook handler).",
+    "Step 2: Create packages/functions/src/renderer/index.ts - the Lambda handler that: (a) receives an event with { s3Key, bucketName } identifying the HTML file on S3, (b) downloads the HTML from S3, (c) launches Puppeteer with @sparticuz/chromium, (d) sets viewport to 794x1123 (A4 at 96dpi), (e) renders HTML to PNG screenshot, (f) uploads the PNG back to S3 at the same key but with .png extension (replacing .html), (g) returns { pngS3Key } in the response. Use the same S3 client pattern as shared/s3.ts. Handle font loading by including Google Fonts @import in the HTML (already done in renderer.py TEMPLATE). Set Chromium args for Lambda environment.",
+    "Step 3: Create packages/infra/lib/constructs/renderer.ts - CDK construct that: (a) defines a NodejsFunction Lambda for the renderer at packages/functions/src/renderer/index.ts, (b) sets runtime to Node.js 20, timeout 60s, memory 2048MB (Puppeteer needs more memory), (c) grants S3 read/write on the prints bucket, (d) exposes the Lambda function so webhook handler can invoke it. Use the same NodejsFunction bundling pattern as ApiConstruct (minify, sourceMap). Set environment variable BUCKET_NAME.",
+    "Step 4: Integrate RendererConstruct into packages/infra/lib/stacks/homework-print-bot-stack.ts: (a) import and instantiate RendererConstruct passing the S3 bucket, (b) grant the webhook Lambda permission to invoke the renderer Lambda (add lambda:InvokeFunction policy), (c) pass the renderer Lambda ARN to webhook handler as RENDERER_FUNCTION_NAME environment variable.",
+    "Step 5: Modify packages/agent/src/print_generator/entrypoint.py to always save HTML to S3 when Playwright is not available (current behavior saves html bytes as png content type which is wrong). Change to: save as .html with ContentType text/html and return s3_key with .html extension and a flag 'needs_rendering: true' in the response.",
+    "Step 6: Modify packages/functions/src/webhook/handler.ts sendPrintImage flow: after receiving AgentCore response, check if the response has 'needs_rendering: true'. If so, invoke the renderer Lambda synchronously (using AWS Lambda SDK Invoke with RequestResponse invocation type) with { s3Key, bucketName }, get the pngS3Key from the response, then use that key for the presigned URL and LINE image message. Create a new shared utility packages/functions/src/shared/renderer.ts for the invoke-renderer logic.",
+    "Step 7: Create packages/functions/src/renderer/index.test.ts - unit tests for the renderer Lambda handler using vitest mocks for S3 and puppeteer-core, following the same mock pattern as handler.test.ts and s3.test.ts."
+  ],
+  "acceptance_criteria": [
+    "packages/functions/src/renderer/index.ts exists and exports a handler function that takes S3 key, downloads HTML, renders PNG with Puppeteer, uploads PNG, returns the PNG S3 key",
+    "packages/infra/lib/constructs/renderer.ts exists and defines a RendererConstruct class with NodejsFunction Lambda",
+    "packages/infra/lib/stacks/homework-print-bot-stack.ts includes RendererConstruct and wires it to the webhook handler",
+    "packages/agent/src/print_generator/entrypoint.py saves HTML to S3 with correct content type and returns needs_rendering flag when Playwright is unavailable",
+    "packages/functions/src/webhook/handler.ts calls the renderer Lambda when needs_rendering is true before sending the image to LINE",
+    "pnpm typecheck passes with no errors",
+    "pnpm --filter @homework-print-bot/functions test passes all tests including new renderer tests"
+  ],
+  "verification": [
+    "Run: cd /projects/sandbox/homework-print-bot && pnpm install",
+    "Run: cd /projects/sandbox/homework-print-bot && pnpm typecheck",
+    "Run: cd /projects/sandbox/homework-print-bot && pnpm --filter @homework-print-bot/functions test"
+  ],
+  "blocked_reason": null,
+  "findings": "1. pnpm-workspace.yaml needed allowBuilds: esbuild: true to enable esbuild postinstall script. 2. The original lockfile had supply-chain policy violations (minimumReleaseAge) so it was regenerated from scratch. 3. sendPrintImage was changed to read BUCKET_NAME from process.env at call time (instead of module-level const) to fix a pre-existing test issue where the test could not clear the env var after module load. 4. The webhook handler.test.ts needed additional mocks for @aws-sdk/client-s3 and ../shared/renderer after the new imports were added."
+}

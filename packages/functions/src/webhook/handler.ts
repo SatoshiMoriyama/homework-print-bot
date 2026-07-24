@@ -7,11 +7,10 @@ import { getUserState, createOrUpdateState, setLastPrintId, clearWaitingState } 
 import { getParent, createParent, getChildrenByFamily, createChild, findChildByNickname } from "../shared/family";
 import { invokeAgent } from "../shared/agentcore";
 import { getPresignedUrl } from "../shared/s3";
+import { invokeRenderer } from "../shared/renderer";
 
 const LINE_CHANNEL_SECRET_PARAM = process.env.LINE_CHANNEL_SECRET_PARAM;
 const LINE_CHANNEL_ACCESS_TOKEN_PARAM = process.env.LINE_CHANNEL_ACCESS_TOKEN_PARAM;
-const BUCKET_NAME = process.env.BUCKET_NAME || "";
-
 // SSM client and secret cache (cold start only)
 const ssmClient = new SSMClient({});
 const s3Client = new S3Client({});
@@ -175,8 +174,13 @@ async function handleTextMessage(
           await pushText(userId, `エラーが発生しました: ${result.error}`);
         } else {
           const printId = result.print_id as string;
-          const s3Key = result.s3_key as string;
+          let s3Key = result.s3_key as string;
           await setLastPrintId(userId, printId);
+          // If the agent returned HTML (needs rendering), invoke the renderer Lambda
+          if (result.needs_rendering) {
+            const rendered = await invokeRenderer({ s3Key, bucketName: process.env.BUCKET_NAME || "" });
+            s3Key = rendered.pngS3Key;
+          }
           await sendPrintImage(userId, s3Key);
         }
       } catch (err) {
@@ -244,8 +248,13 @@ async function handleTextMessage(
             await pushText(userId, `修正エラー: ${result.error}`);
           } else {
             const printId = result.print_id as string;
-            const s3Key = result.s3_key as string;
+            let s3Key = result.s3_key as string;
             await setLastPrintId(userId, printId);
+            // If the agent returned HTML (needs rendering), invoke the renderer Lambda
+            if (result.needs_rendering) {
+              const rendered = await invokeRenderer({ s3Key, bucketName: process.env.BUCKET_NAME || "" });
+              s3Key = rendered.pngS3Key;
+            }
             await sendPrintImage(userId, s3Key);
           }
         } catch (err) {
@@ -291,7 +300,7 @@ async function handleImageMessage(
     // Upload to S3
     const s3Key = `answers/${state.active_child_id}/${messageId}.jpg`;
     await s3Client.send(new PutObjectCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: process.env.BUCKET_NAME || "",
       Key: s3Key,
       Body: imageBuffer,
       ContentType: "image/jpeg",
@@ -339,11 +348,12 @@ async function pushText(userId: string, text: string): Promise<void> {
 }
 
 export async function sendPrintImage(userId: string, s3Key: string): Promise<void> {
-  if (!BUCKET_NAME) {
+  const bucketName = process.env.BUCKET_NAME || "";
+  if (!bucketName) {
     throw new Error('Environment variable "BUCKET_NAME" is not configured');
   }
   try {
-    const presignedUrl = await getPresignedUrl(BUCKET_NAME, s3Key);
+    const presignedUrl = await getPresignedUrl(bucketName, s3Key);
     const client = await getLineClient();
     await client.pushMessage(userId, {
       type: "image",

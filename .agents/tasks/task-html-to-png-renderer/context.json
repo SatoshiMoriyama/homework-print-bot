@@ -1,0 +1,32 @@
+{
+  "project_type": "pnpm monorepo with TypeScript Lambda functions, AWS CDK infrastructure, and Python AgentCore agent",
+  "language": "TypeScript (functions, infra), Python (agent)",
+  "build_system": "pnpm workspace, tsc for TypeScript packages, uv for Python agent",
+  "test_framework": "vitest for functions package (src/**/*.test.ts pattern), vitest mocks with vi.mock",
+  "build_command": "pnpm -r build (runs tsc in each package)",
+  "test_command": "pnpm --filter @homework-print-bot/functions test",
+  "verification_instructions": "1. Run pnpm install to ensure deps. 2. Run pnpm typecheck for TypeScript checking. 3. Run pnpm test for unit tests.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "pnpm install at root to install all workspace dependencies",
+  "environment_constraints": "OPEN_INTERNET - can install npm packages freely. Node.js 22, pnpm available. No Docker needed for validation.",
+  "contribution_requirements": "CI runs pnpm typecheck on PRs. TypeScript strict mode enabled. Tests use vitest with mocking.",
+  "key_patterns": "CDK constructs in packages/infra/lib/constructs/, each exports a class. Stack in stacks/homework-print-bot-stack.ts composes all constructs. Lambda handlers in packages/functions/src/<feature>/handler.ts. Shared utils in packages/functions/src/shared/. Tests colocated as *.test.ts. ApiConstruct uses NodejsFunction bundling. Agent entrypoint.py uses render_to_png which falls back to HTML bytes when Playwright unavailable.",
+  "relevant_files": [
+    "packages/functions/package.json",
+    "packages/functions/tsconfig.json",
+    "packages/functions/src/webhook/handler.ts",
+    "packages/functions/src/shared/agentcore.ts",
+    "packages/functions/src/shared/s3.ts",
+    "packages/functions/src/webhook/handler.test.ts",
+    "packages/infra/package.json",
+    "packages/infra/tsconfig.json",
+    "packages/infra/lib/constructs/api.ts",
+    "packages/infra/lib/constructs/s3.ts",
+    "packages/infra/lib/constructs/agentcore.ts",
+    "packages/infra/lib/stacks/homework-print-bot-stack.ts",
+    "packages/agent/src/print_generator/entrypoint.py",
+    "packages/agent/src/print_generator/renderer.py",
+    "packages/agent/src/main.py"
+  ],
+  "directory_structure": "Root: pnpm-workspace.yaml, tsconfig.base.json, package.json. packages/functions/ - TypeScript Lambda handlers (webhook). packages/infra/ - CDK infra with constructs/ and stacks/ dirs. packages/agent/ - Python AgentCore agent with src/ containing print_generator, grading, adaptive_learning modules."
+}

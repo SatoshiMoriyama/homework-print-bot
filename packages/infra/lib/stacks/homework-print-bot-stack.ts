@@ -5,6 +5,7 @@ import { S3Construct } from "../constructs/s3";
 import { ApiConstruct } from "../constructs/api";
 import { AgentCoreConstruct } from "../constructs/agentcore";
 import { MonitoringConstruct } from "../constructs/monitoring";
+import { RendererConstruct } from "../constructs/renderer";
 
 export class HomeworkPrintBotStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -16,6 +17,15 @@ export class HomeworkPrintBotStack extends cdk.Stack {
       tables: dynamodb.tables,
       bucket: s3.bucket,
     });
+    const renderer = new RendererConstruct(this, "Renderer", {
+      bucket: s3.bucket,
+    });
+
+    // Grant webhook handler permission to invoke the renderer Lambda
+    renderer.rendererFunction.grantInvoke(api.webhookHandler);
+    // Pass renderer function name as environment variable to webhook handler
+    api.webhookHandler.addEnvironment("RENDERER_FUNCTION_NAME", renderer.rendererFunction.functionName);
+
     new AgentCoreConstruct(this, "AgentCore", {
       tables: dynamodb.tables,
       bucket: s3.bucket,

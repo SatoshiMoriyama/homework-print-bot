@@ -1,0 +1,14 @@
+{
+  "task_id": "task-html-to-png-renderer",
+  "task_description": "Implement Lambda + Puppeteer HTML-to-PNG rendering: a dedicated renderer Lambda using @sparticuz/chromium + puppeteer-core, CDK construct, and integration with the existing AgentCore/webhook flow so LINE receives PNG images instead of HTML.",
+  "status": "completed",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "TypeScript type checking passes for both functions and infra packages. All 14 tests pass (3 test files: s3.test.ts 2 tests, renderer/index.test.ts 5 tests, handler.test.ts 7 tests). Review fixes applied: CDK bundling.nodeModules added, waitUntil changed to domcontentloaded, needs_rendering test cases added, Python HTML detection helper extracted, BUCKET_NAME usage unified."
+  }
+}
