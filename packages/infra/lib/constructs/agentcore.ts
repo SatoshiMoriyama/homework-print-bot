@@ -34,6 +34,7 @@ export class AgentCoreConstruct extends Construct {
         LEARNING_STATS_TABLE: props.tables.learningStats.tableName,
         BUCKET_NAME: props.bucket.bucketName,
         BEDROCK_MODEL_ID: "jp.anthropic.claude-sonnet-4-6",
+        FONTCONFIG_PATH: "/tmp/fonts",
       },
     });
 

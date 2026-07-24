@@ -3,6 +3,8 @@
 import asyncio
 import atexit
 import logging
+import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -14,12 +16,62 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Font setup for Lambda / AgentCore environments
+# ---------------------------------------------------------------------------
+
+# Locate the fonts directory relative to this file (shipped in CodeZip)
+_PACKAGE_ROOT = Path(__file__).resolve().parent.parent.parent  # packages/agent
+_FONTS_DIR = _PACKAGE_ROOT / "fonts"
+
+
+def _setup_fontconfig() -> None:
+    """Configure fontconfig so Chromium can find bundled Noto Sans JP fonts.
+
+    This copies the font file to /tmp/fonts (writable in Lambda) and points
+    FONTCONFIG_PATH to the fonts.conf that references it.
+    """
+    target_dir = Path("/tmp/fonts")
+    conf_source = _FONTS_DIR / "fonts.conf"
+    font_source = _FONTS_DIR / "NotoSansJP-Regular.ttf"
+
+    if not font_source.exists():
+        logger.warning("Font file not found at %s — Japanese text may not render", font_source)
+        return
+
+    # Copy font to /tmp/fonts so Chromium can read it
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_font = target_dir / "NotoSansJP-Regular.ttf"
+    if not target_font.exists():
+        shutil.copy2(font_source, target_font)
+        logger.info("Copied Noto Sans JP font to %s", target_font)
+
+    # Copy fonts.conf to /tmp/fonts
+    target_conf = target_dir / "fonts.conf"
+    if not target_conf.exists() and conf_source.exists():
+        shutil.copy2(conf_source, target_conf)
+
+    # Set environment variables for fontconfig
+    os.environ.setdefault("FONTCONFIG_PATH", str(target_dir))
+    os.environ.setdefault("FONTCONFIG_FILE", str(target_conf))
+
+
+# Run font setup at import time so Chromium picks up fonts on first launch
+_setup_fontconfig()
+
+
 TEMPLATE = """<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap');
+@font-face {
+  font-family: 'Noto Sans JP';
+  font-style: normal;
+  font-weight: 100 900;
+  src: url('file:///tmp/fonts/NotoSansJP-Regular.ttf') format('truetype');
+  font-display: block;
+}
 
 * {
   margin: 0;
@@ -236,13 +288,24 @@ if HAS_PLAYWRIGHT:
                 pw = async_playwright()
                 _playwright_context = await pw.start()
 
+            chromium_args = [
+                "--disable-gpu",
+                "--font-render-hinting=none",
+                "--disable-lcd-text",
+                "--allow-file-access-from-files",
+                "--no-sandbox",
+            ]
             try:
-                _browser = await _playwright_context.chromium.launch(headless=True)
+                _browser = await _playwright_context.chromium.launch(
+                    headless=True, args=chromium_args
+                )
             except Exception as first_error:
                 logger.warning("Chromium launch failed, attempting to install: %s", first_error)
                 await _ensure_chromium_installed()
                 try:
-                    _browser = await _playwright_context.chromium.launch(headless=True)
+                    _browser = await _playwright_context.chromium.launch(
+                        headless=True, args=chromium_args
+                    )
                 except Exception as second_error:
                     raise RuntimeError(
                         "Failed to launch Chromium even after installation attempt."
@@ -298,7 +361,9 @@ async def render_to_pdf(html: str) -> bytes:
     browser = await _get_browser()
     page = await browser.new_page()
     try:
-        await page.set_content(html, wait_until="networkidle")
+        await page.set_content(html, wait_until="load")
+        # Wait briefly for font rendering to settle
+        await page.wait_for_timeout(500)
         pdf_bytes = await page.pdf(format="A4")
         return pdf_bytes
     finally:
@@ -322,7 +387,9 @@ async def render_to_png(html: str) -> bytes:
     page = await browser.new_page()
     try:
         await page.set_viewport_size({"width": 794, "height": 1123})  # A4 at 96dpi
-        await page.set_content(html, wait_until="networkidle")
+        await page.set_content(html, wait_until="load")
+        # Wait briefly for font rendering to settle
+        await page.wait_for_timeout(500)
         png_bytes = await page.screenshot(full_page=True)
         return png_bytes
     finally:
