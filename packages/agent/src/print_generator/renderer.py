@@ -1,9 +1,14 @@
 """Print renderer - converts questions JSON to PDF/PNG using HTML templates."""
 
-import json
-import os
-import tempfile
+import asyncio
+import atexit
+import logging
+import sys
 from pathlib import Path
+
+from playwright.async_api import Browser, async_playwright
+
+logger = logging.getLogger(__name__)
 
 TEMPLATE = """<!DOCTYPE html>
 <html lang="ja">
@@ -169,11 +174,141 @@ def save_html_to_file(html: str, output_path: str) -> str:
     return output_path
 
 
-async def render_to_pdf(html: str) -> bytes:
-    """Render HTML to PDF using Puppeteer/Playwright.
+# ---------------------------------------------------------------------------
+# Browser lifecycle management
+# ---------------------------------------------------------------------------
 
-    Note: In production, this would use Puppeteer with chromium-min in a Lambda Layer.
-    For now, returns HTML bytes as a placeholder.
+_browser: Browser | None = None
+_playwright_context = None
+_browser_lock = asyncio.Lock()
+
+
+async def _ensure_chromium_installed() -> None:
+    """Ensure Chromium is installed for Playwright. Attempts installation if missing.
+
+    Uses asyncio.create_subprocess_exec to avoid blocking the event loop.
+    First tries with --with-deps; falls back to without if that fails.
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, "-m", "playwright", "install", "chromium", "--with-deps",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        if proc.returncode != 0:
+            logger.warning(
+                "Chromium install with --with-deps failed, retrying without: %s",
+                stderr.decode(),
+            )
+            proc = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", "playwright", "install", "chromium",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+            if proc.returncode != 0:
+                raise RuntimeError(
+                    f"Failed to install Chromium via playwright install: {stderr.decode()}"
+                )
+        logger.info("Chromium installed successfully")
+    except FileNotFoundError as e:
+        raise RuntimeError(
+            "Playwright is not available. Install it with: pip install playwright"
+        ) from e
+    except TimeoutError as e:
+        raise RuntimeError(
+            "Chromium installation timed out after 300 seconds"
+        ) from e
+
+
+async def _get_browser() -> Browser:
+    """Get or create a shared browser instance (lazy initialization).
+
+    Launches Chromium on first call and reuses the instance for subsequent calls.
+    If Chromium is not installed, attempts to install it via subprocess.
+    Uses an asyncio.Lock to prevent concurrent initialization attempts.
+
+    Returns:
+        A Playwright Browser instance.
+
+    Raises:
+        RuntimeError: If Chromium cannot be launched or installed.
+    """
+    global _browser, _playwright_context
+
+    if _browser is not None and _browser.is_connected():
+        return _browser
+
+    async with _browser_lock:
+        # Double-check after acquiring lock
+        if _browser is not None and _browser.is_connected():
+            return _browser
+
+        if _playwright_context is None:
+            pw = async_playwright()
+            _playwright_context = await pw.start()
+
+        try:
+            _browser = await _playwright_context.chromium.launch(headless=True)
+        except Exception as first_error:
+            logger.warning("Chromium launch failed, attempting to install: %s", first_error)
+            await _ensure_chromium_installed()
+            try:
+                _browser = await _playwright_context.chromium.launch(headless=True)
+            except Exception as second_error:
+                raise RuntimeError(
+                    "Failed to launch Chromium even after installation attempt. "
+                    "Ensure Playwright and Chromium are properly installed: "
+                    "pip install playwright && python -m playwright install chromium --with-deps"
+                ) from second_error
+
+    return _browser
+
+
+async def shutdown_browser() -> None:
+    """Shut down the shared browser instance and stop the Playwright context.
+
+    Call this to cleanly release browser resources at process exit or when
+    the browser is no longer needed.
+    """
+    global _browser, _playwright_context
+
+    if _browser is not None:
+        try:
+            await _browser.close()
+        except Exception:
+            logger.warning("Error closing browser during shutdown", exc_info=True)
+        _browser = None
+
+    if _playwright_context is not None:
+        try:
+            await _playwright_context.stop()
+        except Exception:
+            logger.warning("Error stopping Playwright context during shutdown", exc_info=True)
+        _playwright_context = None
+
+
+def _atexit_shutdown() -> None:
+    """atexit handler that schedules browser shutdown."""
+    try:
+        loop = asyncio.get_running_loop()
+        # Loop is currently running — schedule cleanup as a task
+        loop.create_task(shutdown_browser())
+    except RuntimeError:
+        # No running loop — create a temporary one for cleanup
+        try:
+            asyncio.run(shutdown_browser())
+        except Exception:
+            # Interpreter is shutting down; nothing to clean up
+            pass
+
+
+atexit.register(_atexit_shutdown)
+
+
+async def render_to_pdf(html: str) -> bytes:
+    """Render HTML to PDF using Playwright.
 
     Args:
         html: The rendered HTML string
@@ -181,25 +316,18 @@ async def render_to_pdf(html: str) -> bytes:
     Returns:
         PDF bytes.
     """
-    # In production, this would use:
-    # from playwright.async_api import async_playwright
-    # async with async_playwright() as p:
-    #     browser = await p.chromium.launch()
-    #     page = await browser.new_page()
-    #     await page.set_content(html)
-    #     pdf_bytes = await page.pdf(format='A4')
-    #     await browser.close()
-    #     return pdf_bytes
-
-    # Placeholder: return HTML as bytes
-    return html.encode("utf-8")
+    browser = await _get_browser()
+    page = await browser.new_page()
+    try:
+        await page.set_content(html, wait_until="networkidle")
+        pdf_bytes = await page.pdf(format="A4")
+        return pdf_bytes
+    finally:
+        await page.close()
 
 
 async def render_to_png(html: str) -> bytes:
-    """Render HTML to PNG using Puppeteer/Playwright.
-
-    Note: In production, this would use Puppeteer with chromium-min in a Lambda Layer.
-    For now, returns empty bytes as a placeholder.
+    """Render HTML to PNG using Playwright.
 
     Args:
         html: The rendered HTML string
@@ -207,19 +335,12 @@ async def render_to_png(html: str) -> bytes:
     Returns:
         PNG bytes.
     """
-    # In production, this would use:
-    # from playwright.async_api import async_playwright
-    # async with async_playwright() as p:
-    #     browser = await p.chromium.launch()
-    #     page = await browser.new_page()
-    #     await page.set_viewport_size({"width": 794, "height": 1123})  # A4 at 96dpi
-    #     await page.set_content(html)
-    #     png_bytes = await page.screenshot(full_page=True)
-    #     await browser.close()
-    #     return png_bytes
-
-    # TODO: This is a placeholder that returns UTF-8 encoded HTML, NOT a valid PNG.
-    # Downstream code uploads this as ContentType=image/png, which will be invalid.
-    # This will NOT produce a valid PNG until Puppeteer/Playwright is integrated.
-    # Placeholder
-    return html.encode("utf-8")
+    browser = await _get_browser()
+    page = await browser.new_page()
+    try:
+        await page.set_viewport_size({"width": 794, "height": 1123})  # A4 at 96dpi
+        await page.set_content(html, wait_until="networkidle")
+        png_bytes = await page.screenshot(full_page=True)
+        return png_bytes
+    finally:
+        await page.close()

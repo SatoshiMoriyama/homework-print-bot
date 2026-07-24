@@ -6,6 +6,7 @@ import { parseCommand, isModificationInstruction, parseTextAnswers } from "./com
 import { getUserState, createOrUpdateState, setLastPrintId, clearWaitingState } from "../shared/state";
 import { getParent, createParent, getChildrenByFamily, createChild, findChildByNickname } from "../shared/family";
 import { invokeAgent } from "../shared/agentcore";
+import { getPresignedUrl } from "../shared/s3";
 
 const LINE_CHANNEL_SECRET_PARAM = process.env.LINE_CHANNEL_SECRET_PARAM;
 const LINE_CHANNEL_ACCESS_TOKEN_PARAM = process.env.LINE_CHANNEL_ACCESS_TOKEN_PARAM;
@@ -176,14 +177,7 @@ async function handleTextMessage(
           const printId = result.print_id as string;
           const s3Key = result.s3_key as string;
           await setLastPrintId(userId, printId);
-          // Send the print image via LINE
-          const imageUrl = `https://${BUCKET_NAME}.s3.ap-northeast-1.amazonaws.com/${s3Key}`;
-          const client = await getLineClient();
-          await client.pushMessage(userId, {
-            type: "image",
-            originalContentUrl: imageUrl,
-            previewImageUrl: imageUrl,
-          });
+          await sendPrintImage(userId, s3Key);
         }
       } catch (err) {
         console.error("AgentCore invoke error (generate_print):", err);
@@ -252,13 +246,7 @@ async function handleTextMessage(
             const printId = result.print_id as string;
             const s3Key = result.s3_key as string;
             await setLastPrintId(userId, printId);
-            const imageUrl = `https://${BUCKET_NAME}.s3.ap-northeast-1.amazonaws.com/${s3Key}`;
-            const client = await getLineClient();
-            await client.pushMessage(userId, {
-              type: "image",
-              originalContentUrl: imageUrl,
-              previewImageUrl: imageUrl,
-            });
+            await sendPrintImage(userId, s3Key);
           }
         } catch (err) {
           console.error("AgentCore invoke error (regenerate_print):", err);
@@ -348,6 +336,24 @@ async function replyText(replyToken: string, text: string): Promise<MessageAPIRe
 async function pushText(userId: string, text: string): Promise<void> {
   const client = await getLineClient();
   await client.pushMessage(userId, { type: "text", text });
+}
+
+export async function sendPrintImage(userId: string, s3Key: string): Promise<void> {
+  if (!BUCKET_NAME) {
+    throw new Error('Environment variable "BUCKET_NAME" is not configured');
+  }
+  try {
+    const presignedUrl = await getPresignedUrl(BUCKET_NAME, s3Key);
+    const client = await getLineClient();
+    await client.pushMessage(userId, {
+      type: "image",
+      originalContentUrl: presignedUrl,
+      previewImageUrl: presignedUrl,
+    });
+  } catch (error) {
+    console.error("Failed to send print image", { userId, s3Key, error });
+    throw error;
+  }
 }
 
 const WELCOME_MESSAGE = `ようこそ！しゅくだいプリントBotだよ 📝
