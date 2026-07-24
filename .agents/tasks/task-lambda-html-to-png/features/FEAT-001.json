@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add the HTML-to-PNG renderer Lambda function using @sparticuz/chromium + puppeteer-core, triggered by S3 PutObject events on .html files in the prints/ prefix.",
+  "status": "in_progress",
+  "steps": [
+    "Create packages/functions/src/renderer/handler.ts - a Lambda handler that: (a) receives S3 PutObject event, (b) reads HTML from S3 using @aws-sdk/client-s3, (c) launches headless Chromium via @sparticuz/chromium + puppeteer-core, (d) renders HTML to PNG (A4 viewport 794x1123 at 96dpi), (e) uploads PNG to S3 at same key path but with .png extension, (f) handles errors gracefully. Use the pattern from packages/functions/src/webhook/handler.ts for the export style. The Lambda environment variable BUCKET_NAME should be used for the bucket name (same pattern as webhook handler).",
+    "Add @sparticuz/chromium and puppeteer-core as dependencies to packages/functions/package.json. These are runtime dependencies for the renderer Lambda.",
+    "Create packages/infra/lib/constructs/renderer.ts - a CDK construct (RendererConstruct) that: (a) creates a NodejsFunction pointing to packages/functions/src/renderer/handler.ts, (b) uses Runtime.NODEJS_20_X, (c) sets memorySize to 2048 MB (Chromium needs memory), (d) sets timeout to 60 seconds, (e) sets environment variable BUCKET_NAME, (f) grants S3 read/write on the bucket, (g) adds S3 event notification for ObjectCreated with prefix 'prints/' and suffix '.html' to trigger the Lambda. Follow the pattern from packages/infra/lib/constructs/api.ts for NodejsFunction usage. The bundling config should NOT externalize @sparticuz/chromium (it must be included in the bundle). Use aws-cdk-lib/aws-s3-notifications for the S3 event source.",
+    "Update packages/infra/lib/stacks/homework-print-bot-stack.ts to import and instantiate the new RendererConstruct, passing the s3.bucket as a prop. Add it after the S3 construct instantiation.",
+    "Update packages/agent/src/print_generator/entrypoint.py - change both handle_generate_print and handle_regenerate_print to: (a) save HTML (not PNG bytes) to S3, (b) change s3_key from .png to .html, (c) change ContentType from 'image/png' to 'text/html', (d) remove the await render_to_png(html) call and just use html.encode('utf-8') directly as the Body. Keep the import of render_html. The render_to_png import and calls should be removed since rendering is now handled by the Lambda.",
+    "Run 'pnpm install' to update the lockfile with new dependencies, then run 'pnpm build' and 'pnpm typecheck' to verify everything compiles."
+  ],
+  "acceptance_criteria": [
+    "packages/functions/src/renderer/handler.ts exists and exports a handler function that processes S3 events",
+    "packages/infra/lib/constructs/renderer.ts exists and creates a NodejsFunction with S3 event notification trigger",
+    "packages/infra/lib/stacks/homework-print-bot-stack.ts instantiates RendererConstruct",
+    "packages/agent/src/print_generator/entrypoint.py saves HTML (not PNG) to S3 with .html extension and text/html content type",
+    "render_to_png is no longer called in entrypoint.py",
+    "'pnpm build' succeeds without errors",
+    "'pnpm typecheck' succeeds without errors"
+  ],
+  "verification": [
+    "Run 'cd /projects/sandbox/homework-print-bot && pnpm install' to install new dependencies",
+    "Run 'cd /projects/sandbox/homework-print-bot && pnpm build' and confirm exit code 0",
+    "Run 'cd /projects/sandbox/homework-print-bot && pnpm typecheck' and confirm exit code 0"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

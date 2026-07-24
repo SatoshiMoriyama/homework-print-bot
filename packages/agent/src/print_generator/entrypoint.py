@@ -6,7 +6,7 @@ import boto3
 from ulid import ULID
 
 from .agent import generate_print, regenerate_print
-from .renderer import render_html, render_to_png
+from .renderer import render_html
 
 S3_BUCKET = os.environ.get("BUCKET_NAME", "")
 PRINTS_TABLE = os.environ.get("PRINTS_TABLE", "homework-bot-prints")
@@ -58,19 +58,18 @@ async def handle_generate_print(payload: dict) -> dict:
     # Get unit label
     unit_label = _get_unit_label(subcategory)
 
-    # Render to HTML then PNG
+    # Render to HTML
     html = render_html(questions, unit_label)
-    png_bytes = await render_to_png(html)
 
-    # Upload to S3
+    # Upload HTML to S3 (Lambda will render to PNG)
     print_id = str(ULID())
-    s3_key = f"prints/{child_id}/{print_id}.png"
+    s3_key = f"prints/{child_id}/{print_id}.html"
 
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=s3_key,
-        Body=png_bytes,
-        ContentType="image/png",
+        Body=html.encode("utf-8"),
+        ContentType="text/html",
     )
 
     # Save to DynamoDB
@@ -130,20 +129,19 @@ async def handle_regenerate_print(payload: dict) -> dict:
     if not questions:
         return {"error": "Failed to regenerate questions"}
 
-    # Render
+    # Render HTML
     unit_label = _get_unit_label(subcategory)
     html = render_html(questions, unit_label)
-    png_bytes = await render_to_png(html)
 
-    # Upload new version
+    # Upload HTML to S3 (Lambda will render to PNG)
     new_print_id = str(ULID())
-    s3_key = f"prints/{child_id}/{new_print_id}.png"
+    s3_key = f"prints/{child_id}/{new_print_id}.html"
 
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=s3_key,
-        Body=png_bytes,
-        ContentType="image/png",
+        Body=html.encode("utf-8"),
+        ContentType="text/html",
     )
 
     # Save to DynamoDB
