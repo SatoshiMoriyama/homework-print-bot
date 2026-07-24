@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "fix",
   "description": "Address PR review comments: fix _ensure_chromium_installed() to use sys.executable with --with-deps fallback, fix _atexit_shutdown() for Python 3.12+ compatibility, and revert pyproject.toml build-system changes that are out of scope.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Add `import sys` to renderer.py",
     "Fix _ensure_chromium_installed() to use sys.executable, add --with-deps fallback, rename unused stdout to _",
@@ -22,5 +22,5 @@
     "cd packages/agent && uv run pytest tests/ -v"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "pyproject.toml build-system changes could not be reverted: the original 'hatchling.backends' is a non-existent module (typo in base branch) and the [tool.hatch.build.targets.wheel] config is required for hatch to locate the src/ directory. Both must remain for uv sync and tests to work. All renderer.py fixes (sys.executable, --with-deps fallback, _atexit_shutdown Python 3.12+ pattern) were applied successfully. All 4 tests pass."
 }
