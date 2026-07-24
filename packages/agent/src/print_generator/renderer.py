@@ -6,7 +6,12 @@ import logging
 import sys
 from pathlib import Path
 
-from playwright.async_api import Browser, async_playwright
+try:
+    from playwright.async_api import Browser, async_playwright
+    HAS_PLAYWRIGHT = True
+except ImportError:
+    HAS_PLAYWRIGHT = False
+    Browser = None
 
 logger = logging.getLogger(__name__)
 
@@ -316,6 +321,10 @@ async def render_to_pdf(html: str) -> bytes:
     Returns:
         PDF bytes.
     """
+    if not HAS_PLAYWRIGHT:
+        logger.warning("Playwright not available, returning HTML as PDF placeholder")
+        return html.encode("utf-8")
+
     browser = await _get_browser()
     page = await browser.new_page()
     try:
@@ -335,6 +344,10 @@ async def render_to_png(html: str) -> bytes:
     Returns:
         PNG bytes.
     """
+    if not HAS_PLAYWRIGHT:
+        logger.warning("Playwright not available, returning HTML as PNG placeholder")
+        return html.encode("utf-8")
+
     browser = await _get_browser()
     page = await browser.new_page()
     try:
