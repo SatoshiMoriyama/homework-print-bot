@@ -1,6 +1,5 @@
 """Entrypoint for Print Generator Agent - handles AgentCore invocation."""
 
-import json
 import os
 import boto3
 from ulid import ULID
