@@ -16,10 +16,13 @@ SAMPLE_UNIT_LABEL = "たしざん（くりあがりなし）"
 @pytest.fixture(autouse=True)
 async def reset_browser_state():
     """Reset the global browser state before each test to avoid cross-event-loop issues."""
+    import asyncio
+
     import src.print_generator.renderer as renderer_mod
 
     renderer_mod._browser = None
     renderer_mod._playwright_context = None
+    renderer_mod._browser_lock = asyncio.Lock()
     yield
     # Clean up after test
     if renderer_mod._browser is not None and renderer_mod._browser.is_connected():
@@ -28,6 +31,7 @@ async def reset_browser_state():
         await renderer_mod._playwright_context.stop()
     renderer_mod._browser = None
     renderer_mod._playwright_context = None
+    renderer_mod._browser_lock = asyncio.Lock()
 
 
 @pytest.fixture
