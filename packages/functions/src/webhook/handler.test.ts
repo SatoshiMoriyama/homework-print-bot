@@ -25,8 +25,20 @@ vi.mock("@aws-sdk/client-ssm", () => {
   return { SSMClient, GetParameterCommand };
 });
 
+vi.mock("@aws-sdk/client-s3", () => {
+  const send = vi.fn().mockResolvedValue({});
+  const S3Client = vi.fn().mockImplementation(() => ({ send }));
+  const PutObjectCommand = vi.fn().mockImplementation((input) => input);
+  const GetObjectCommand = vi.fn().mockImplementation((input) => input);
+  return { S3Client, PutObjectCommand, GetObjectCommand };
+});
+
 vi.mock("../shared/s3", () => ({
   getPresignedUrl: vi.fn().mockResolvedValue("https://presigned.example.com/image.png"),
+}));
+
+vi.mock("../shared/renderer", () => ({
+  invokeRenderer: vi.fn().mockResolvedValue({ pngS3Key: "prints/test.png" }),
 }));
 
 import { sendPrintImage } from "./handler";

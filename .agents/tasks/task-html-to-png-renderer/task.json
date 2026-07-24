@@ -1,0 +1,7 @@
+{
+  "task_id": "task-html-to-png-renderer",
+  "task_description": "Implement Lambda + Puppeteer HTML-to-PNG rendering: a dedicated renderer Lambda using @sparticuz/chromium + puppeteer-core, CDK construct, and integration with the existing AgentCore/webhook flow so LINE receives PNG images instead of HTML.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

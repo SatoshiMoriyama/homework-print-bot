@@ -70,15 +70,35 @@ async def handle_generate_print(payload: dict) -> dict:
     html = render_html(questions, unit_label)
     png_bytes = await render_to_png(html)
 
-    # Upload to S3
+    # Determine if Playwright was available (render_to_png returns HTML bytes as fallback)
     print_id = _generate_id()
-    s3_key = f"prints/{child_id}/{print_id}.png"
+    needs_rendering = False
 
+    # If png_bytes is actually HTML (Playwright was not available), save as .html
+    try:
+        html_decoded = png_bytes.decode("utf-8")
+        if html_decoded.strip().startswith("<!DOCTYPE html>") or html_decoded.strip().startswith("<html"):
+            # Playwright was not available, save as HTML
+            needs_rendering = True
+            s3_key = f"prints/{child_id}/{print_id}.html"
+            content_type = "text/html"
+            body = png_bytes
+        else:
+            s3_key = f"prints/{child_id}/{print_id}.png"
+            content_type = "image/png"
+            body = png_bytes
+    except (UnicodeDecodeError, AttributeError):
+        # Binary PNG data
+        s3_key = f"prints/{child_id}/{print_id}.png"
+        content_type = "image/png"
+        body = png_bytes
+
+    # Upload to S3
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=s3_key,
-        Body=png_bytes,
-        ContentType="image/png",
+        Body=body,
+        ContentType=content_type,
     )
 
     # Save to DynamoDB
@@ -97,12 +117,16 @@ async def handle_generate_print(payload: dict) -> dict:
         }
     )
 
-    return {
+    response = {
         "print_id": print_id,
         "s3_key": s3_key,
         "questions": questions,
         "unit_label": unit_label,
     }
+    if needs_rendering:
+        response["needs_rendering"] = True
+
+    return response
 
 
 async def handle_regenerate_print(payload: dict) -> dict:
@@ -143,15 +167,35 @@ async def handle_regenerate_print(payload: dict) -> dict:
     html = render_html(questions, unit_label)
     png_bytes = await render_to_png(html)
 
-    # Upload new version
+    # Determine if Playwright was available (render_to_png returns HTML bytes as fallback)
     new_print_id = _generate_id()
-    s3_key = f"prints/{child_id}/{new_print_id}.png"
+    needs_rendering = False
 
+    # If png_bytes is actually HTML (Playwright was not available), save as .html
+    try:
+        html_decoded = png_bytes.decode("utf-8")
+        if html_decoded.strip().startswith("<!DOCTYPE html>") or html_decoded.strip().startswith("<html"):
+            # Playwright was not available, save as HTML
+            needs_rendering = True
+            s3_key = f"prints/{child_id}/{new_print_id}.html"
+            content_type = "text/html"
+            body = png_bytes
+        else:
+            s3_key = f"prints/{child_id}/{new_print_id}.png"
+            content_type = "image/png"
+            body = png_bytes
+    except (UnicodeDecodeError, AttributeError):
+        # Binary PNG data
+        s3_key = f"prints/{child_id}/{new_print_id}.png"
+        content_type = "image/png"
+        body = png_bytes
+
+    # Upload to S3
     s3_client.put_object(
         Bucket=S3_BUCKET,
         Key=s3_key,
-        Body=png_bytes,
-        ContentType="image/png",
+        Body=body,
+        ContentType=content_type,
     )
 
     # Save to DynamoDB
@@ -169,12 +213,16 @@ async def handle_regenerate_print(payload: dict) -> dict:
         }
     )
 
-    return {
+    response_data = {
         "print_id": new_print_id,
         "s3_key": s3_key,
         "questions": questions,
         "unit_label": unit_label,
     }
+    if needs_rendering:
+        response_data["needs_rendering"] = True
+
+    return response_data
 
 
 def _get_unit_label(subcategory: str) -> str:
