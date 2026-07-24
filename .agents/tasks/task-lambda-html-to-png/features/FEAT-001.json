@@ -26,5 +26,5 @@
     "Run 'cd /projects/sandbox/homework-print-bot && pnpm typecheck' and confirm exit code 0"
   ],
   "blocked_reason": null,
-  "findings": "All steps completed successfully. pnpm install, pnpm build, and pnpm typecheck all pass with exit code 0. @sparticuz/chromium v131 and puppeteer-core v23 installed. The bundling config does NOT externalize @sparticuz/chromium (it will be included in the bundle)."
+  "findings": "All steps completed successfully. pnpm install, pnpm build, and pnpm typecheck all pass with exit code 0. @sparticuz/chromium v131 and puppeteer-core v23 installed. The bundling config does NOT externalize @sparticuz/chromium (it will be included in the bundle). Review fixes applied: (1) pyproject.toml build-backend restored to hatchling.build with wheel packages config, (2) unused imports and dead code removed from renderer.py, (3) DynamoDB now stores .png key with status=rendering, Lambda updates status to rendered after completion, (4) source maps disabled in Lambda bundling to reduce deployment size, (5) RendererConstruct now receives printsTable prop for DynamoDB access."
 }
