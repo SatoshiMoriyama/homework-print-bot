@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Create the html-to-png renderer Lambda function in packages/functions/src/renderer/ using puppeteer-core and @sparticuz/chromium, plus its CDK construct in packages/infra/lib/constructs/renderer.ts, and integrate it into the stack and webhook handler flow.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Step 1: Add puppeteer-core and @sparticuz/chromium as dependencies to packages/functions/package.json. Add @aws-sdk/client-lambda as a dependency (needed for invoking the renderer Lambda from webhook handler).",
     "Step 2: Create packages/functions/src/renderer/index.ts - the Lambda handler that: (a) receives an event with { s3Key, bucketName } identifying the HTML file on S3, (b) downloads the HTML from S3, (c) launches Puppeteer with @sparticuz/chromium, (d) sets viewport to 794x1123 (A4 at 96dpi), (e) renders HTML to PNG screenshot, (f) uploads the PNG back to S3 at the same key but with .png extension (replacing .html), (g) returns { pngS3Key } in the response. Use the same S3 client pattern as shared/s3.ts. Handle font loading by including Google Fonts @import in the HTML (already done in renderer.py TEMPLATE). Set Chromium args for Lambda environment.",
@@ -27,5 +27,5 @@
     "Run: cd /projects/sandbox/homework-print-bot && pnpm --filter @homework-print-bot/functions test"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "1. pnpm-workspace.yaml needed allowBuilds: esbuild: true to enable esbuild postinstall script. 2. The original lockfile had supply-chain policy violations (minimumReleaseAge) so it was regenerated from scratch. 3. sendPrintImage was changed to read BUCKET_NAME from process.env at call time (instead of module-level const) to fix a pre-existing test issue where the test could not clear the env var after module load. 4. The webhook handler.test.ts needed additional mocks for @aws-sdk/client-s3 and ../shared/renderer after the new imports were added."
 }
