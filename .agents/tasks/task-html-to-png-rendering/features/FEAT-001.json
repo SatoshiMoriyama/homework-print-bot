@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Implement render_to_png and render_to_pdf in renderer.py using Playwright to produce valid PNG/PDF output from the HTML template. Add playwright dependency to pyproject.toml. Include browser lifecycle management with lazy initialization and proper cleanup.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Add 'playwright>=1.48.0' to the dependencies list in packages/agent/pyproject.toml",
     "In packages/agent/src/print_generator/renderer.py, implement render_to_png using Playwright's async API: launch Chromium with headless mode, set viewport to A4 at 96dpi (794x1123), set content with wait_until='networkidle' (to load Google Fonts), take a full-page screenshot, close browser, return PNG bytes",
@@ -27,5 +27,5 @@
     "cd packages/agent && uv run ruff check src/"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "1. pyproject.toml had pre-existing bug: build-backend was 'hatchling.backends' (invalid), fixed to 'hatchling.build'. 2. Added [tool.hatch.build.targets.wheel] packages=['src'] to support the src/ layout. 3. Playwright Chromium installed without --with-deps since apt-get is not available in sandbox (not Ubuntu). 4. The 'Event loop is closed' warning from asyncio.run() in one-off scripts is expected and harmless in production. 5. Pre-existing ruff lint errors (17) exist in other src/ files but renderer.py passes cleanly. 6. uv.lock file generated and committed."
 }
