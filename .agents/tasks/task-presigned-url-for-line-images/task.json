@@ -1,6 +1,6 @@
 {
   "task_id": "task-presigned-url-for-line-images",
-  "task_description": "Implement presigned URL generation for S3 images before sending them to LINE. Use @aws-sdk/s3-request-presigner with getSignedUrl to generate temporary URLs with 1-hour expiry, so that LINE can access private S3 bucket images.",
+  "task_description": "Implement presigned URL generation for S3 images before sending them to LINE. Use @aws-sdk/s3-request-presigner with getSignedUrl to generate temporary URLs with 6-hour expiry, so that LINE can access private S3 bucket images.",
   "status": "completed",
   "feature_order": ["FEAT-001"],
   "blocked_reason": null,
@@ -9,6 +9,6 @@
     "tests": "pass",
     "test_quality": "pass",
     "docker_build": "skipped",
-    "summary": "pnpm build, pnpm typecheck, and pnpm test all pass. 2 unit tests verify getPresignedUrl function with default and custom expiresIn."
+    "summary": "pnpm build, pnpm typecheck, and pnpm test all pass. 6 unit tests across 2 test files: s3.test.ts and handler.test.ts."
   }
 }

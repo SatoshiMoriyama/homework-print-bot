@@ -1,13 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Use vi.hoisted to set env vars before module evaluation (vi.mock is hoisted above normal code)
-vi.hoisted(() => {
+// Use vi.hoisted to set env vars and define mocks before module evaluation (vi.mock is hoisted above normal code)
+const mockPushMessage = vi.hoisted(() => {
   process.env.LINE_CHANNEL_SECRET_PARAM = "/test/secret";
   process.env.LINE_CHANNEL_ACCESS_TOKEN_PARAM = "/test/token";
   process.env.BUCKET_NAME = "test-bucket";
+  return vi.fn().mockResolvedValue({});
 });
-
-const mockPushMessage = vi.fn().mockResolvedValue({});
 
 vi.mock("@line/bot-sdk", () => ({
   validateSignature: vi.fn(),

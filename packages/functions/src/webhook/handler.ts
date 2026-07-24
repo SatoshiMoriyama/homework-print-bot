@@ -143,6 +143,8 @@ async function handleTextMessage(
         }
       }
       // TODO: Call Print Generator Agent
+      // Once the Print Generator Agent produces the print image and stores it in S3,
+      // it will call sendPrintImage(userId, s3Key) to deliver the image to the user via LINE.
       await replyText(replyToken, "プリントを作成中... 📝");
       break;
     }

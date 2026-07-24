@@ -6,9 +6,9 @@
   "steps": [
     "Add @aws-sdk/s3-request-presigner to packages/functions/package.json dependencies",
     "Run pnpm install from workspace root to update lockfile",
-    "Create a new shared utility file packages/functions/src/shared/s3.ts that: (a) imports S3Client and GetObjectCommand from @aws-sdk/client-s3, (b) imports getSignedUrl from @aws-sdk/s3-request-presigner, (c) creates and exports a cached S3Client instance, (d) exports a function getPresignedUrl(bucket: string, key: string, expiresIn?: number) that generates a presigned URL with default 1-hour (3600 seconds) expiry",
+    "Create a new shared utility file packages/functions/src/shared/s3.ts that: (a) imports S3Client and GetObjectCommand from @aws-sdk/client-s3, (b) imports getSignedUrl from @aws-sdk/s3-request-presigner, (c) creates and exports a cached S3Client instance, (d) exports a function getPresignedUrl(bucket: string, key: string, expiresIn?: number) that generates a presigned URL with default 6-hour (21600 seconds) expiry",
     "In packages/functions/src/webhook/handler.ts, import the new getPresignedUrl function from '../shared/s3' and export a helper function sendPrintImage(userId: string, s3Key: string) that: (a) reads BUCKET_NAME from process.env, (b) calls getPresignedUrl to generate a presigned URL for the given s3Key, (c) uses the LINE client (via getLineClient()) to call pushMessage with an image message where both originalContentUrl and previewImageUrl use the presigned URL",
-    "Add a unit test file packages/functions/src/shared/s3.test.ts that tests the getPresignedUrl function by mocking @aws-sdk/s3-request-presigner's getSignedUrl and verifying it is called with correct parameters (bucket, key, expiresIn defaults to 3600)",
+    "Add a unit test file packages/functions/src/shared/s3.test.ts that tests the getPresignedUrl function by mocking @aws-sdk/s3-request-presigner's getSignedUrl and verifying it is called with correct parameters (bucket, key, expiresIn defaults to 21600)",
     "Run pnpm typecheck to verify the code compiles without errors",
     "Run pnpm test to verify the test passes"
   ],
