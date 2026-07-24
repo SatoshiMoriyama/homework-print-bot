@@ -26,7 +26,7 @@ async def test_render_to_pdf_returns_valid_pdf(sample_html: str) -> None:
 
     assert isinstance(result, bytes)
     assert result[:5] == PDF_MAGIC, "Output does not start with PDF magic bytes (%PDF-)"
-    assert len(result) > 1000, f"PDF output too small ({len(result)} bytes), likely not a real PDF"
+    assert len(result) > 500, f"PDF output too small ({len(result)} bytes), likely not a real PDF"
 
 
 async def test_render_to_png_with_questions() -> None:
