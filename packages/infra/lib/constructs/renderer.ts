@@ -24,11 +24,29 @@ export class RendererConstruct extends Construct {
       memorySize: 2048,
       environment: {
         BUCKET_NAME: props.bucket.bucketName,
+        FONTCONFIG_PATH: "/tmp/fonts",
+        FONTCONFIG_FILE: "/tmp/fonts/fonts.conf",
       },
       bundling: {
         minify: true,
         sourceMap: true,
         nodeModules: ["@sparticuz/chromium", "puppeteer-core"],
+        commandHooks: {
+          beforeBundling(_inputDir: string, _outputDir: string): string[] {
+            return [];
+          },
+          afterBundling(_inputDir: string, outputDir: string): string[] {
+            const fontsSource = path.join(__dirname, "../../../functions/src/renderer/fonts");
+            return [
+              `mkdir -p ${outputDir}/fonts`,
+              `cp ${fontsSource}/NotoSansJP-Regular.ttf ${outputDir}/fonts/`,
+              `cp ${fontsSource}/fonts.conf ${outputDir}/fonts/`,
+            ];
+          },
+          beforeInstall(): string[] {
+            return [];
+          },
+        },
       },
     });
 

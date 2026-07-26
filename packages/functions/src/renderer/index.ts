@@ -8,8 +8,42 @@
 import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
+import * as fs from "fs";
+import * as path from "path";
 
 const s3Client = new S3Client({});
+
+// ---------------------------------------------------------------------------
+// Font setup: Copy Noto Sans JP to /tmp/fonts so Chromium can find it
+// ---------------------------------------------------------------------------
+const FONTS_DIR = "/tmp/fonts";
+const SOURCE_FONTS_DIR = path.join(__dirname, "fonts");
+
+function setupFonts(): void {
+  if (fs.existsSync(path.join(FONTS_DIR, "NotoSansJP-Regular.ttf"))) {
+    return; // Already set up (warm start)
+  }
+
+  fs.mkdirSync(FONTS_DIR, { recursive: true });
+
+  // Copy font file
+  const fontSrc = path.join(SOURCE_FONTS_DIR, "NotoSansJP-Regular.ttf");
+  if (fs.existsSync(fontSrc)) {
+    fs.copyFileSync(fontSrc, path.join(FONTS_DIR, "NotoSansJP-Regular.ttf"));
+  }
+
+  // Copy fonts.conf
+  const confSrc = path.join(SOURCE_FONTS_DIR, "fonts.conf");
+  if (fs.existsSync(confSrc)) {
+    fs.copyFileSync(confSrc, path.join(FONTS_DIR, "fonts.conf"));
+  }
+
+  // Set environment variables for fontconfig
+  process.env.FONTCONFIG_PATH = FONTS_DIR;
+  process.env.FONTCONFIG_FILE = path.join(FONTS_DIR, "fonts.conf");
+}
+
+setupFonts();
 
 export interface RendererEvent {
   s3Key: string;
@@ -46,8 +80,9 @@ export async function handler(event: RendererEvent): Promise<RendererResponse> {
   const html = await getResponse.Body.transformToString("utf-8");
 
   // Launch browser with @sparticuz/chromium
+  chromium.setGraphicsMode = false;
   const browser = await puppeteer.launch({
-    args: chromium.args,
+    args: [...chromium.args, "--font-render-hinting=none"],
     defaultViewport: { width: 794, height: 1123 },
     executablePath: await chromium.executablePath(),
     headless: true,
@@ -56,7 +91,7 @@ export async function handler(event: RendererEvent): Promise<RendererResponse> {
   let pngBuffer: Buffer;
   try {
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    await page.setContent(html, { waitUntil: "networkidle0" });
     const screenshot = await page.screenshot({ fullPage: true });
     pngBuffer = Buffer.from(screenshot);
     await page.close();
