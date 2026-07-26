@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "handler.ts のプリント生成リクエストから固定 subcategory を削除し、agent 側 (entrypoint.py) で子供の current_unit_order を DynamoDB から取得して adaptive_learning の推薦ロジックを使い自動で単元を選択する",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. packages/functions/src/webhook/handler.ts の print_request case (約130行目) で invokeAgent に渡す params から固定値 { subcategory: \"addition_no_carry\", difficulty: 1, question_count: 8 } を削除する。params フィールド自体を空オブジェクト {} にするか、params を省略する。child_id と action はそのまま維持する。",
     "2. packages/agent/src/print_generator/entrypoint.py の handle_generate_print 関数を修正: params に subcategory が含まれない場合、CHILDREN_TABLE から child_id をキーに子供レコードを取得し current_unit_order を読み出す (デフォルト値は 1)。",
@@ -25,5 +25,5 @@
     "cd /projects/sandbox/homework-print-bot && pnpm test"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Node.js/pnpm not pre-installed in sandbox - installed via mise (node@20 + pnpm@9). Python agent tests require ulid-py and pytest/pytest-asyncio installed via uv pip. uv.lock was updated during uv sync to include playwright (already in pyproject.toml deps but missing from lock). All TypeScript tests (14 passed) and Python tests (10 passed) green."
 }
