@@ -65,7 +65,7 @@ async def handle_generate_print(payload: dict) -> dict:
 
     subcategory = params.get("subcategory")
 
-    if subcategory:
+    if subcategory is not None:
         # Explicit subcategory provided - use it directly (backward compatibility)
         difficulty = params.get("difficulty", 1)
         question_count = params.get("question_count", 8)
@@ -75,17 +75,20 @@ async def handle_generate_print(payload: dict) -> dict:
         # No subcategory - auto-select based on child's learning progress
         from ..adaptive_learning.agent import determine_next_problem
 
-        children_table = dynamodb.Table(CHILDREN_TABLE)
-        child_response = children_table.get_item(Key={"child_id": child_id})
-        child_record = child_response.get("Item", {})
-        current_unit_order = int(child_record.get("current_unit_order", 1))
+        try:
+            children_table = dynamodb.Table(CHILDREN_TABLE)
+            child_response = children_table.get_item(Key={"child_id": child_id})
+            child_record = child_response.get("Item", {})
+            current_unit_order = int(child_record.get("current_unit_order", 1))
 
-        recommendation = determine_next_problem(child_id, current_unit_order)
-        subcategory = recommendation["subcategory"]
-        category = recommendation["category"]
-        difficulty = recommendation["difficulty"]
-        question_count = recommendation["question_count"]
-        weak_areas = recommendation.get("weak_areas", [])
+            recommendation = determine_next_problem(child_id, current_unit_order)
+            subcategory = recommendation["subcategory"]
+            category = recommendation["category"]
+            difficulty = recommendation["difficulty"]
+            question_count = recommendation["question_count"]
+            weak_areas = recommendation.get("weak_areas", [])
+        except Exception as e:
+            return {"error": f"Failed to determine next problem: {e}"}
 
     # Generate questions
     result = generate_print(

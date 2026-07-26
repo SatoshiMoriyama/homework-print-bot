@@ -262,6 +262,158 @@ class TestHandleGeneratePrintAutoSelect:
         assert item["subcategory"] == "addition_with_carry"
 
 
+class TestHandleGeneratePrintAutoSelectErrors:
+    """Tests for error handling in the auto-select path."""
+
+    @pytest.mark.asyncio
+    async def test_dynamodb_client_error_returns_error_dict(
+        self,
+        mock_dynamodb,
+        mock_s3_client,
+        mock_generate_print,
+        mock_render_to_png,
+        mock_determine_next_problem,
+    ):
+        """When DynamoDB get_item raises ClientError, should return structured error."""
+        from botocore.exceptions import ClientError
+
+        children_table = MagicMock()
+        children_table.get_item.side_effect = ClientError(
+            {"Error": {"Code": "ResourceNotFoundException", "Message": "Table not found"}},
+            "GetItem",
+        )
+        prints_table = MagicMock()
+
+        def table_side_effect(name):
+            if name == "homework-bot-children":
+                return children_table
+            return prints_table
+
+        mock_dynamodb.Table.side_effect = table_side_effect
+
+        payload = {
+            "action": "generate_print",
+            "child_id": "child-1",
+        }
+
+        result = await handle_generate_print(payload)
+
+        assert "error" in result
+        assert "Failed to determine next problem" in result["error"]
+        # generate_print should NOT have been called
+        mock_generate_print.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_determine_next_problem_raises_returns_error_dict(
+        self,
+        mock_dynamodb,
+        mock_s3_client,
+        mock_generate_print,
+        mock_render_to_png,
+        mock_determine_next_problem,
+    ):
+        """When determine_next_problem raises an exception, should return structured error."""
+        children_table = MagicMock()
+        children_table.get_item.return_value = {
+            "Item": {"child_id": "child-1", "current_unit_order": 2}
+        }
+        prints_table = MagicMock()
+
+        def table_side_effect(name):
+            if name == "homework-bot-children":
+                return children_table
+            return prints_table
+
+        mock_dynamodb.Table.side_effect = table_side_effect
+
+        mock_determine_next_problem.side_effect = RuntimeError("Recommendation engine failed")
+
+        payload = {
+            "action": "generate_print",
+            "child_id": "child-1",
+        }
+
+        result = await handle_generate_print(payload)
+
+        assert "error" in result
+        assert "Failed to determine next problem" in result["error"]
+        assert "Recommendation engine failed" in result["error"]
+        mock_generate_print.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_non_numeric_unit_order_returns_error_dict(
+        self,
+        mock_dynamodb,
+        mock_s3_client,
+        mock_generate_print,
+        mock_render_to_png,
+        mock_determine_next_problem,
+    ):
+        """When current_unit_order is a non-numeric string, int() raises ValueError
+        which should be caught and returned as structured error."""
+        children_table = MagicMock()
+        children_table.get_item.return_value = {
+            "Item": {"child_id": "child-1", "current_unit_order": "not_a_number"}
+        }
+        prints_table = MagicMock()
+
+        def table_side_effect(name):
+            if name == "homework-bot-children":
+                return children_table
+            return prints_table
+
+        mock_dynamodb.Table.side_effect = table_side_effect
+
+        payload = {
+            "action": "generate_print",
+            "child_id": "child-1",
+        }
+
+        result = await handle_generate_print(payload)
+
+        assert "error" in result
+        assert "Failed to determine next problem" in result["error"]
+        mock_generate_print.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_empty_string_subcategory_uses_explicit_path(
+        self,
+        mock_dynamodb,
+        mock_s3_client,
+        mock_generate_print,
+        mock_render_to_png,
+        mock_determine_next_problem,
+    ):
+        """When subcategory is empty string, should use the explicit path
+        (not auto-select), since empty string is not None."""
+        prints_table = MagicMock()
+        mock_dynamodb.Table.return_value = prints_table
+
+        payload = {
+            "action": "generate_print",
+            "child_id": "child-1",
+            "params": {
+                "subcategory": "",
+                "difficulty": 2,
+                "question_count": 5,
+            },
+        }
+
+        result = await handle_generate_print(payload)
+
+        # determine_next_problem should NOT be called because subcategory is not None
+        mock_determine_next_problem.assert_not_called()
+
+        # generate_print should be called with the explicit (empty) subcategory
+        mock_generate_print.assert_called_once_with(
+            child_id="child-1",
+            subcategory="",
+            difficulty=2,
+            question_count=5,
+            weak_areas=[],
+        )
+
+
 class TestHandleGeneratePrintExplicitSubcategory:
     """Tests for handle_generate_print when subcategory is explicitly provided (backward compat)."""
 
