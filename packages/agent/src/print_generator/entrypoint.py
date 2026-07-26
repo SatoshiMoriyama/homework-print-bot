@@ -19,6 +19,7 @@ from .renderer import render_html, render_to_png
 
 S3_BUCKET = os.environ.get("BUCKET_NAME", "")
 PRINTS_TABLE = os.environ.get("PRINTS_TABLE", "homework-bot-prints")
+CHILDREN_TABLE = os.environ.get("CHILDREN_TABLE", "homework-bot-children")
 
 s3_client = boto3.client("s3", region_name="ap-northeast-1")
 dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
@@ -62,10 +63,29 @@ async def handle_generate_print(payload: dict) -> dict:
     child_id = payload["child_id"]
     params = payload.get("params", {})
 
-    subcategory = params.get("subcategory", "addition_no_carry")
-    difficulty = params.get("difficulty", 1)
-    question_count = params.get("question_count", 8)
-    weak_areas = params.get("weak_areas", [])
+    subcategory = params.get("subcategory")
+
+    if subcategory:
+        # Explicit subcategory provided - use it directly (backward compatibility)
+        difficulty = params.get("difficulty", 1)
+        question_count = params.get("question_count", 8)
+        weak_areas = params.get("weak_areas", [])
+        category = params.get("category", "")
+    else:
+        # No subcategory - auto-select based on child's learning progress
+        from ..adaptive_learning.agent import determine_next_problem
+
+        children_table = dynamodb.Table(CHILDREN_TABLE)
+        child_response = children_table.get_item(Key={"child_id": child_id})
+        child_record = child_response.get("Item", {})
+        current_unit_order = int(child_record.get("current_unit_order", 1))
+
+        recommendation = determine_next_problem(child_id, current_unit_order)
+        subcategory = recommendation["subcategory"]
+        category = recommendation["category"]
+        difficulty = recommendation["difficulty"]
+        question_count = recommendation["question_count"]
+        weak_areas = recommendation.get("weak_areas", [])
 
     # Generate questions
     result = generate_print(
@@ -109,7 +129,7 @@ async def handle_generate_print(payload: dict) -> dict:
             "print_id": print_id,
             "child_id": child_id,
             "created_at": _generate_id(),  # Use timestamp
-            "category": params.get("category", ""),
+            "category": category,
             "subcategory": subcategory,
             "difficulty": difficulty,
             "questions": questions,

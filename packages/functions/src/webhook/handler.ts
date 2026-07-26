@@ -168,7 +168,6 @@ async function handleTextMessage(
         const result = await invokeAgent({
           action: "generate_print",
           child_id: state!.active_child_id!,
-          params: { subcategory: "addition_no_carry", difficulty: 1, question_count: 8 },
         }, userId);
         if (result.error) {
           await pushText(userId, `エラーが発生しました: ${result.error}`);
