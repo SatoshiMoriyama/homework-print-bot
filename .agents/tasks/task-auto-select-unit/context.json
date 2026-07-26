@@ -1,0 +1,25 @@
+{
+  "project_type": "Monorepo: LINE Bot webhook (TypeScript Lambda) + Bedrock AgentCore agents (Python 3.12) + CDK infra",
+  "language": "TypeScript + Python",
+  "build_system": "pnpm workspaces, uv for Python, CDK for infra",
+  "test_framework": "vitest for TypeScript (packages/functions), pytest with pytest-asyncio for Python (packages/agent/tests/)",
+  "build_command": "pnpm build (runs tsc in packages/functions)",
+  "test_command": "pnpm test (runs vitest in packages/functions, pytest in packages/agent)",
+  "verification_instructions": "1. Run pnpm install at root, 2. Run pnpm typecheck, 3. Run pnpm test",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "pnpm install at root; cd packages/agent && uv sync for Python deps",
+  "environment_constraints": "INTEGRATIONS_ONLY network - no external package installs, no Docker. Use pre-installed runtimes for validation. TypeScript type-checking (tsc --noEmit) is the primary host-based validation for TS changes.",
+  "contribution_requirements": "Follow existing code patterns. Use existing shared modules.",
+  "key_patterns": "handler.ts dispatches commands via switch/case, calls invokeAgent with action+payload. Agent main.py dispatches actions to handler functions. print_generator/entrypoint.py has handle_generate_print that receives payload with params dict. adaptive_learning/agent.py has determine_next_problem(child_id, current_unit_order) already implemented. Children table stores current_unit_order on child records (updated by stats.py _try_unlock_next_unit). Tests use vitest mocks extensively for AWS services.",
+  "relevant_files": [
+    "packages/functions/src/webhook/handler.ts",
+    "packages/functions/src/webhook/handler.test.ts",
+    "packages/agent/src/print_generator/entrypoint.py",
+    "packages/agent/src/adaptive_learning/agent.py",
+    "packages/agent/src/adaptive_learning/stats.py",
+    "packages/agent/src/main.py",
+    "packages/functions/src/shared/agentcore.ts",
+    "packages/functions/src/shared/family.ts"
+  ],
+  "directory_structure": "packages/functions/src/webhook/ - LINE webhook handler; packages/functions/src/shared/ - shared modules (agentcore, family, state, s3); packages/agent/src/ - Python agent with print_generator/, adaptive_learning/, grading/ submodules; packages/agent/tests/ - pytest tests; packages/infra/ - CDK stack definitions"
+}

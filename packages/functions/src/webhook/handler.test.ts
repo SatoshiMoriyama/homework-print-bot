@@ -186,6 +186,10 @@ describe("needs_rendering flow", () => {
     const result = await handler(makeWebhookEvent("プリント"));
 
     expect(result.statusCode).toBe(200);
+    expect(invokeAgent).toHaveBeenCalledWith({
+      action: "generate_print",
+      child_id: "child-1",
+    }, "user123");
     expect(invokeRenderer).toHaveBeenCalledWith({
       s3Key: "prints/child-1/print-abc.html",
       bucketName: "test-bucket",

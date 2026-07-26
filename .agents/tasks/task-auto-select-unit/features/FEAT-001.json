@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "handler.ts のプリント生成リクエストから固定 subcategory を削除し、agent 側 (entrypoint.py) で子供の current_unit_order を DynamoDB から取得して adaptive_learning の推薦ロジックを使い自動で単元を選択する",
+  "status": "completed",
+  "steps": [
+    "1. packages/functions/src/webhook/handler.ts の print_request case (約130行目) で invokeAgent に渡す params から固定値 { subcategory: \"addition_no_carry\", difficulty: 1, question_count: 8 } を削除する。params フィールド自体を空オブジェクト {} にするか、params を省略する。child_id と action はそのまま維持する。",
+    "2. packages/agent/src/print_generator/entrypoint.py の handle_generate_print 関数を修正: params に subcategory が含まれない場合、CHILDREN_TABLE から child_id をキーに子供レコードを取得し current_unit_order を読み出す (デフォルト値は 1)。",
+    "3. entrypoint.py で取得した current_unit_order を使って adaptive_learning.agent.determine_next_problem(child_id, current_unit_order) を呼び出し、返される subcategory, difficulty, question_count, weak_areas を使って generate_print を呼ぶ。",
+    "4. entrypoint.py で params に subcategory が明示的に渡された場合は従来通りその値を使う (後方互換性の維持)。",
+    "5. DynamoDB prints テーブルに保存する Item の category フィールドに determine_next_problem から返された category を設定する (現在は params.get('category', '') で空になりがち)。",
+    "6. packages/functions/src/webhook/handler.test.ts のテストを更新: invokeAgent に渡される payload の期待値から固定の params を削除し、新しいペイロード形式に合わせる。",
+    "7. packages/agent/tests/ に test_entrypoint.py を追加: handle_generate_print が params に subcategory なしで呼ばれた場合に DynamoDB から current_unit_order を取得し determine_next_problem を呼ぶことをテスト (boto3 と determine_next_problem をモックする)。"
+  ],
+  "acceptance_criteria": [
+    "handler.ts の invokeAgent 呼び出しに固定の subcategory/difficulty/question_count が含まれないこと",
+    "entrypoint.py が params に subcategory がない場合に CHILDREN_TABLE から current_unit_order を取得すること",
+    "entrypoint.py が determine_next_problem の結果を使って generate_print を呼ぶこと",
+    "params に subcategory が明示的に渡された場合は従来通り動作すること (後方互換)",
+    "TypeScript の型チェック (pnpm typecheck) がパスすること",
+    "既存テストおよび新規テストがパスすること"
+  ],
+  "verification": [
+    "cd /projects/sandbox/homework-print-bot && pnpm install && pnpm typecheck",
+    "cd /projects/sandbox/homework-print-bot && pnpm test"
+  ],
+  "blocked_reason": null,
+  "findings": "Node.js/pnpm not pre-installed in sandbox - installed via mise (node@20 + pnpm@9). Python agent tests require ulid-py and pytest/pytest-asyncio installed via uv pip. uv.lock was updated during uv sync to include playwright (already in pyproject.toml deps but missing from lock). Test fix applied: test_entrypoint.py now mocks strands, playwright, and internal agent modules at sys.modules level before importing entrypoint, resolving ModuleNotFoundError and Python 3.10 syntax incompatibility (list[str] | None) on Python 3.9. Pre-existing test_renderer.py failures (3 tests) require Playwright binary which is not installed. All 6 entrypoint tests pass, 1 renderer HTML test passes."
+}
