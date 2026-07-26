@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Remove hardcoded subcategory/difficulty/question_count from handler.ts and make print_generator/entrypoint.py auto-select the next unit using adaptive_learning logic",
+  "status": "completed",
+  "steps": [
+    "In packages/functions/src/webhook/handler.ts, modify the 'print_request' case (around line 130) to remove the hardcoded params: { subcategory: 'addition_no_carry', difficulty: 1, question_count: 8 }. Instead, send just the action and child_id without params (or with an empty params object), letting the agent decide.",
+    "In packages/agent/src/print_generator/entrypoint.py, modify handle_generate_print() so that when params is empty or subcategory is missing, it: (1) fetches the child's current_unit_order from the CHILDREN_TABLE DynamoDB table using child_id, (2) calls determine_next_problem(child_id, current_unit_order) from adaptive_learning.agent, (3) uses the returned category/subcategory/difficulty/question_count/weak_areas to generate the print.",
+    "Add appropriate import of determine_next_problem from ..adaptive_learning.agent in entrypoint.py",
+    "Handle the fallback gracefully: if the child record is not found in CHILDREN_TABLE, default to current_unit_order=1 (first unit).",
+    "Ensure the params passed explicitly (if any) still override the auto-selection, maintaining backward compatibility for the regenerate_print path."
+  ],
+  "acceptance_criteria": [
+    "handler.ts no longer sends hardcoded subcategory/difficulty/question_count in the generate_print payload",
+    "print_generator/entrypoint.py auto-fetches child's current_unit_order and calls determine_next_problem when no subcategory is provided in params",
+    "If params.subcategory is explicitly provided, it is still used (backward compatibility)",
+    "TypeScript type-check passes (pnpm typecheck)",
+    "Python code is syntactically valid and imports resolve correctly"
+  ],
+  "verification": [
+    "Run `pnpm typecheck` from workspace root to confirm TypeScript compiles without errors",
+    "Run `cd packages/agent && python -c \"from src.print_generator.entrypoint import handle_generate_print; print('OK')\"` to confirm imports resolve"
+  ],
+  "blocked_reason": null,
+  "findings": "python-ulid was missing from pyproject.toml dependencies but was used in existing code. Added it to fix import resolution. uv.lock was regenerated accordingly. All tests pass (4/4 in test_renderer.py). TypeScript typecheck passes cleanly."
+}
