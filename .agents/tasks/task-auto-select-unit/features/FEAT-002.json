@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "fix",
   "description": "コードレビューで指摘された3件の問題を修正: (1) auto-selectパスの例外ハンドリング追加, (2) subcategoryの空文字判定を is not None に変更, (3) DynamoDB/推薦失敗時のテスト追加",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. entrypoint.py の auto-select パス (DynamoDB 読み込み + determine_next_problem) を try/except で囲み、例外時に構造化された {\"error\": \"...\"} レスポンスを返す",
     "2. `if subcategory:` を `if subcategory is not None:` に変更し、空文字列の場合は明示パスとして処理されるようにする",
@@ -20,5 +20,5 @@
     "cd /projects/sandbox/homework-print-bot/packages/agent && python3 -m pytest tests/test_entrypoint.py -v"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "All 10 entrypoint tests pass. Pre-existing test_renderer.py failures (3 tests requiring Playwright binary) remain unchanged. TypeScript typecheck and vitest both pass."
 }
