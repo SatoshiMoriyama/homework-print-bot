@@ -16,10 +16,10 @@
 **So that** 子供に家庭学習をさせることができる
 
 #### 受入基準
-- AC-1.1: LINEでメッセージを送って新しいプリントを要求できる（例:「プリント」「さんすう」）
+- AC-1.1: LINEでメッセージを送って新しいプリントを要求できる（例:「プリント」「ぷりんと」「もんだい」）
 - AC-1.2: 回答を提出して採点が完了すると、次のプリントが自動で配信される
 - AC-1.3: 生成されるプリントは学習指導要領に準拠した内容である
-- AC-1.4: プリントはPDF形式または画像形式（PNG/JPEG）で配信される
+- AC-1.4: プリントはPNG画像形式で配信される（S3 presigned URL経由でLINE画像メッセージとして送信）
 - AC-1.5: 科目指定は将来対応（初期はさんすう固定）
 - AC-1.6: 生成されたプリントの内容を保護者が確認し、修正指示をテキストで伝えて再生成できる
 - AC-1.7: 修正指示の例:「もう少し簡単にして」「ひき算を増やして」「問題数を減らして」
@@ -36,7 +36,7 @@
 - AC-2.3: 各問題について正解・不正解が明示される
 - AC-2.4: 不正解の問題には正しい答えだけでなく、どこが間違っていたか（式や途中経過の誤り）が説明される
 - AC-2.5: 画像が不鮮明・判読不能な場合は、該当箇所をテキストで手入力するよう促すメッセージが返される
-- AC-2.6: 手入力で回答を送信した場合も同様に採点される
+- AC-2.6: 手入力で回答を送信した場合も同様に採点される（①②等の丸数字または番号で回答を指定）
 - AC-2.7: 算数の場合、答えだけでなく式も含めて正誤を判定する（例: 答えが合っていても式が間違っていれば指摘する）
 
 ### US-3: 学習履歴に基づく問題生成
@@ -57,10 +57,10 @@
 
 #### 受入基準
 - AC-4.1: 保護者2名のLINEアカウントで運用する（同一チャネルを共有）
-- AC-4.2: 初回メッセージ送信時に簡単な案内メッセージが表示される
-- AC-4.3: 子供ごとにニックネームを登録し、学習履歴を個別に管理できる
-- AC-4.4: 子供の切り替え（例:「たろうくん」「はなちゃん」）で対象を変更できる
-- AC-4.5: どちらの保護者からメッセージを送っても同じ子供の学習履歴にアクセスできる
+- AC-4.2: 初回メッセージ送信時にウェルカムメッセージが表示され、使い方が案内される
+- AC-4.3: 「登録 ○○くん」コマンドで子供をニックネーム登録し、学習履歴を個別に管理できる
+- AC-4.4: 登録済みの子供のニックネームを含むメッセージで対象を切り替えられる
+- AC-4.5: どちらの保護者からメッセージを送っても同じファミリーの子供の学習履歴にアクセスできる
 
 ---
 
@@ -76,27 +76,31 @@
   - 文章題: たしざんの文章題 / ひきざんの文章題
 - FR-1.2: こくごの問題生成は将来対応とする（初期スコープ外）
 - FR-1.3: A4サイズ（210mm × 297mm）1枚に収まるレイアウトで出力する
-- FR-1.4: 問題数は1枚あたり最大10問とする（単元に応じて調整）
-- FR-1.5: 児童が読める大きめのフォントサイズ（16pt以上）を使用する
-- FR-1.6: 出力形式はPDFおよびPNG画像をサポートする
-- FR-1.7: AWS Bedrock（Claude）を利用して問題文を生成する
+- FR-1.4: 問題数は1枚あたり最大10問とする（単元に応じて調整、デフォルト8問）
+- FR-1.5: 児童が読める大きめのフォントサイズ（18pt以上）を使用する
+- FR-1.6: 出力形式はPNG画像を主とし、Python Agent側ではPDF出力もサポートする
+- FR-1.7: AWS Bedrock（Claude Sonnet 4 — `jp.anthropic.claude-sonnet-4-6`）を利用して問題文を生成する
 - FR-1.8: 保護者からのテキスト修正指示を受けてプリントを再生成できる
 - FR-1.9: 直前に生成したプリントの文脈を保持し、修正指示に対して差分反映する
+- FR-1.10: 問題はJSON形式で生成し（番号・問題文・正解の式・正解）、HTMLテンプレートでレイアウトする
+- FR-1.11: 難易度は5段階（1: とても簡単 〜 5: 難しい）で指定できる
 
 ### FR-2: LINE連携
 - FR-2.1: LINE Messaging APIを利用したWebhookでメッセージを受信する
-- FR-2.2: テキストメッセージによるコマンド受付（「プリント」「りれき」等）
-- FR-2.3: 画像メッセージの受信と保存
-- FR-2.4: プリント画像/PDFの送信
-- FR-2.5: Flex Messageを利用した採点結果の表示
+- FR-2.2: テキストメッセージによるコマンド受付（「プリント」「りれき」「登録 ○○くん」等）
+- FR-2.3: 画像メッセージの受信とS3への保存
+- FR-2.4: S3 presigned URL（有効期限6時間）経由でLINE画像メッセージとしてプリントを送信する
+- FR-2.5: LINE Webhook署名検証によるリクエスト認証
+- FR-2.6: LINEチャネルシークレットおよびアクセストークンはAWS SSM Parameter Store（SecureString）で管理する
+- FR-2.7: テキストメッセージで修正指示を検出し、直前のプリントを再生成する
 
 ### FR-3: 回答画像の認識と採点
-- FR-3.1: 撮影された回答画像からOCR/マルチモーダルAIで回答を読み取る
-- FR-3.2: AWS Bedrock（Claude マルチモーダル）を利用して手書き文字を認識する
+- FR-3.1: 撮影された回答画像からマルチモーダルAIで回答を読み取る
+- FR-3.2: AWS Bedrock（Claude Sonnet 4 マルチモーダル）を利用して手書き文字を認識する
 - FR-3.3: 読み取った回答と正解を比較して採点する
 - FR-3.4: 採点結果を構造化データとして保存する
-- FR-3.5: 判読不能な箇所がある場合、該当問題を特定しテキスト入力を促す
-- FR-3.6: ユーザーがテキストで送信した回答も受け付けて採点する
+- FR-3.5: 判読不能な箇所がある場合、該当問題番号を特定しテキスト入力を促す
+- FR-3.6: ユーザーがテキストで送信した回答も受け付けて採点する（丸数字または番号形式）
 - FR-3.7: 算数の採点では答えだけでなく式・途中計算の正誤も判定する
 - FR-3.8: 間違いの種類を分析する（計算ミス、式の立て方ミス、文字の書き間違い等）
 
@@ -118,6 +122,15 @@
 - FR-5.7: 単元の進行順序は教科書（学習指導要領）の順番に従う
 - FR-5.8: 現在の単元の正解率が基準に達したら次の単元を解放する
 
+### FR-6: HTML→PNG レンダリングパイプライン
+- FR-6.1: Agent（Python）が問題JSONからHTMLを生成し、S3にアップロードする
+- FR-6.2: 専用のRenderer Lambda（TypeScript/Node.js）がS3上のHTMLファイルをPNGに変換する
+- FR-6.3: Renderer Lambdaは `@sparticuz/chromium` + `puppeteer-core` を使用してヘッドレスレンダリングを行う
+- FR-6.4: Webhook Handler LambdaがRenderer Lambdaを同期的にInvokeし、変換されたPNGのS3キーを取得する
+- FR-6.5: レンダリング結果のPNGはS3に保存され、presigned URLでLINEに配信する
+- FR-6.6: 日本語フォント（Noto Sans JP）および絵文字フォント（Noto Color Emoji）をバンドルし、fontconfigで設定する
+- FR-6.7: フォントファイルは `/tmp/fonts` にコピーし、`FONTCONFIG_PATH`/`FONTCONFIG_FILE` 環境変数でChromiumに認識させる
+
 ---
 
 ## 非機能要件
@@ -126,6 +139,8 @@
 - 児童の個人情報は最小限の収集とする
 - 回答画像は採点後に一定期間で自動削除する
 - HTTPS通信の強制
+- LINEチャネルシークレット・アクセストークンはSSM Parameter Store（SecureString）で管理し、Lambda実行時に復号取得する
+- LINE Webhook署名検証による不正リクエスト防止
 
 ### NFR-2: コスト
 - AWS無料利用枠を最大限活用する
@@ -137,24 +152,69 @@
 - ログの集約とモニタリング（CloudWatch）
 - CI/CDパイプラインによる自動デプロイ
 
+### NFR-4: パフォーマンス
+- Renderer Lambdaはメモリ2048MB、タイムアウト60秒で構成する
+- SSMパラメータはLambdaコールドスタート時に取得しキャッシュする（ウォームスタートで再取得しない）
+- S3 presigned URLの有効期限は6時間とする
+
 ---
 
 ## 技術スタック
 
 | カテゴリ | 技術 |
 |---------|------|
-| AIエージェント基盤 | AWS Bedrock AgentCore + Strands SDK (Python) |
-| LLM (主処理) | Amazon Bedrock — Claude Sonnet 5 (問題生成・手書き認識・採点) |
-| LLM (軽量処理) | Amazon Bedrock — Claude Haiku 4.5 (コマンド解析・簡易応答) |
-| LINE連携 | LINE Messaging API |
-| 計算基盤 | AWS Lambda |
+| AIエージェント基盤 | AWS Bedrock AgentCore (`aws-cdk-lib/aws-bedrockagentcore`) + Strands Agents SDK (Python) |
+| AgentCoreランタイム | `bedrock-agentcore[strands-agents]` + `strands-agents` (Python 3.12) |
+| AgentCore呼び出し | `@aws-sdk/client-bedrock-agentcore` — `InvokeAgentRuntimeCommand` (ストリーミング応答、event-stream形式) |
+| セッション管理 | LINE user IDを `runtimeSessionId` として使用（セッションアフィニティ） |
+| LLM | Amazon Bedrock — Claude Sonnet 4 (`jp.anthropic.claude-sonnet-4-6`) |
+| LINE連携 | LINE Messaging API (`@line/bot-sdk`) |
+| LINE秘密情報管理 | AWS SSM Parameter Store (SecureString) — `@aws-sdk/client-ssm` |
+| Webhook Lambda | AWS Lambda (Node.js 20.x / TypeScript) |
+| HTMLレンダリング（Lambda） | `@sparticuz/chromium` + `puppeteer-core` (専用Renderer Lambda、2048MB、60秒タイムアウト) |
+| HTMLレンダリング（Agent） | Playwright (Python、自動インストール対応) |
+| Renderer呼び出し | `@aws-sdk/client-lambda` — 同期Invoke |
+| 画像配信 | S3 presigned URL (`@aws-sdk/s3-request-presigner`、有効期限6時間) |
 | API Gateway | Amazon API Gateway |
-| データストア | Amazon DynamoDB |
+| データストア | Amazon DynamoDB (`@aws-sdk/client-dynamodb`, `@aws-sdk/lib-dynamodb`) |
 | ファイルストレージ | Amazon S3 |
 | IaC | AWS CDK (TypeScript) |
-| 言語 | TypeScript (メイン) / Python (AgentCore部分) |
-| パッケージマネージャ | pnpm (モノレポ構成: pnpm workspaces) |
-| ランタイム | Node.js / Python |
+| 言語 | TypeScript (Webhook・Renderer Lambda) / Python (AgentCoreランタイム) |
+| パッケージマネージャ | pnpm (モノレポ構成: pnpm workspaces) / uv (Python Agent) |
+| ランタイム | Node.js 20.x / Python 3.12 |
+| フォント | Noto Sans JP (日本語) + Noto Color Emoji (絵文字) |
+| フォント設定 | fontconfig (`/tmp/fonts` にコピー、`FONTCONFIG_PATH`/`FONTCONFIG_FILE` 環境変数) |
+
+---
+
+## アーキテクチャ概要
+
+```
+LINE App
+  ↓ Webhook (HTTPS)
+API Gateway
+  ↓
+Webhook Handler Lambda (TypeScript/Node.js)
+  ├── LINE署名検証
+  ├── SSM Parameter Storeからシークレット取得（キャッシュ）
+  ├── コマンド解析（プリント要求 / 採点 / りれき / 登録 / 修正指示）
+  ├── AgentCore Runtime呼び出し（InvokeAgentRuntimeCommand、sessionId=LINE userId）
+  ├── Renderer Lambda同期Invoke（HTML→PNG変換）
+  └── S3 presigned URL生成 → LINE画像メッセージ送信
+
+AgentCore Runtime (Python 3.12)
+  ├── Print Generator Agent（Strands SDK + Bedrock Claude Sonnet 4）
+  │   ├── 問題JSON生成 → HTMLレンダリング → S3アップロード
+  │   └── Playwright (PDF/PNG出力、fontconfig設定済み)
+  ├── Grading Agent（マルチモーダル画像認識 + 採点）
+  └── Adaptive Learning Agent（学習統計 + 難易度調整）
+
+Renderer Lambda (TypeScript/Node.js, 2048MB, 60秒)
+  ├── S3からHTML取得
+  ├── @sparticuz/chromium + puppeteer-core でPNGレンダリング
+  ├── バンドルフォント: NotoSansJP + NotoColorEmoji
+  └── PNG を S3 にアップロード（.html → .png）
+```
 
 ---
 
@@ -165,3 +225,4 @@
 - C-3: 対応科目は将来的にこくごも追加予定
 - C-4: 日本語のみ対応する
 - C-5: AWS東京リージョン（ap-northeast-1）を使用する
+- C-6: Renderer Lambdaのs3Keyは `.html` 拡張子のみ受け付ける（出力は `.png` 拡張子に変換）
