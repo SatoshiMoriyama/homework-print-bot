@@ -1,0 +1,14 @@
+{
+  "task_id": "task-auto-select-unit",
+  "task_description": "Remove hardcoded subcategory from print generation and auto-select the next unit based on child's learning progress using the existing adaptive_learning recommendation logic",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "TypeScript typecheck passes. All 11 Python tests pass (7 new + 4 existing). Tests properly cover auto-selection, explicit-params backward compatibility, and fallback scenarios."
+  }
+}

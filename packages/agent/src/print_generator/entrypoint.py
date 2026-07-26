@@ -1,11 +1,14 @@
 """Entrypoint for Print Generator Agent - handles AgentCore invocation."""
 
 import json
+import logging
 import os
 import boto3
 from ulid import ULID as _ULID
 import uuid
 from typing import Tuple
+
+logger = logging.getLogger(__name__)
 
 def _generate_id() -> str:
     """Generate a unique ID (fallback to uuid4 if ULID fails)."""
@@ -70,16 +73,34 @@ async def handle_generate_print(payload: dict) -> dict:
         weak_areas = params.get("weak_areas", [])
         category = params.get("category", "")
     else:
-        # Auto-select next unit based on child's learning progress
+        # Auto-select next unit based on child's learning progress.
+        # NOTE: current_unit_order is not written back here. The write-back
+        # happens in the grading flow via adaptive_learning/stats.py's
+        # _try_unlock_next_unit(), which updates CHILDREN_TABLE after grading
+        # confirms mastery. This path only reads the current progress.
         from ..adaptive_learning.agent import determine_next_problem
 
         current_unit_order = _get_child_current_unit_order(child_id)
-        next_problem = determine_next_problem(child_id, current_unit_order)
-        category = next_problem["category"]
-        subcategory = next_problem["subcategory"]
-        difficulty = next_problem["difficulty"]
-        question_count = next_problem["question_count"]
-        weak_areas = next_problem.get("weak_areas", [])
+        try:
+            next_problem = determine_next_problem(child_id, current_unit_order)
+            category = next_problem["category"]
+            subcategory = next_problem["subcategory"]
+            difficulty = next_problem["difficulty"]
+            question_count = next_problem["question_count"]
+            weak_areas = next_problem.get("weak_areas", [])
+        except Exception as e:
+            logger.error(
+                "determine_next_problem failed for child %s (unit_order=%d), "
+                "falling back to defaults: %s",
+                child_id,
+                current_unit_order,
+                e,
+            )
+            category = "number_calculation"
+            subcategory = "addition_no_carry"
+            difficulty = 1
+            question_count = 8
+            weak_areas = []
 
     # Generate questions
     result = generate_print(
@@ -228,6 +249,7 @@ def _get_child_current_unit_order(child_id: str) -> int:
     """Fetch the child's current_unit_order from DynamoDB.
 
     Returns 1 if the child record is not found (default to first unit).
+    On DynamoDB errors, logs a warning and falls back to 1.
     """
     children_table_name = os.environ.get("CHILDREN_TABLE", "homework-bot-children")
     table = dynamodb.Table(children_table_name)
@@ -236,8 +258,12 @@ def _get_child_current_unit_order(child_id: str) -> int:
         item = response.get("Item")
         if item:
             return int(item.get("current_unit_order", 1))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(
+            "Failed to fetch current_unit_order for child %s, falling back to 1: %s",
+            child_id,
+            e,
+        )
     return 1
 
 

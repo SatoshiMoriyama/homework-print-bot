@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Add unit tests for the auto-selection logic in print_generator/entrypoint.py",
+  "status": "completed",
+  "steps": [
+    "Create packages/agent/tests/test_print_entrypoint.py with pytest tests for the auto-selection behavior in handle_generate_print.",
+    "Test case 1: When params has no subcategory, verify that determine_next_problem is called with the child's current_unit_order fetched from DynamoDB.",
+    "Test case 2: When params has an explicit subcategory, verify determine_next_problem is NOT called and the explicit value is used.",
+    "Test case 3: When the child record is not found in CHILDREN_TABLE, verify fallback to current_unit_order=1.",
+    "Mock boto3 DynamoDB calls and determine_next_problem to isolate the logic being tested. Also mock generate_print, render_html, render_to_png, and s3_client to avoid external dependencies.",
+    "Follow existing test patterns in conftest.py (pytest-asyncio with asyncio_mode=auto)."
+  ],
+  "acceptance_criteria": [
+    "Test file packages/agent/tests/test_print_entrypoint.py exists with at least 3 test cases",
+    "All tests pass when run with `cd packages/agent && uv run pytest tests/test_print_entrypoint.py`",
+    "Tests properly mock DynamoDB and external calls to isolate the auto-selection logic"
+  ],
+  "verification": [
+    "Run `cd packages/agent && uv run pytest tests/test_print_entrypoint.py -v` and confirm all tests pass"
+  ],
+  "blocked_reason": null,
+  "findings": "All 7 tests pass. pytest-asyncio mode=auto works correctly for the test functions. Mocking strategy uses patch on module-level objects in src.print_generator.entrypoint. The conftest.py autouse fixture for browser state reset does not interfere with these tests."
+}

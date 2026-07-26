@@ -234,7 +234,7 @@ async def test_get_child_current_unit_order_child_found():
 
 
 async def test_get_child_current_unit_order_exception_fallback():
-    """_get_child_current_unit_order returns 1 on DynamoDB exception."""
+    """_get_child_current_unit_order returns 1 on DynamoDB exception and logs a warning."""
     from src.print_generator.entrypoint import _get_child_current_unit_order
 
     mock_table = MagicMock()
@@ -242,6 +242,61 @@ async def test_get_child_current_unit_order_exception_fallback():
 
     with patch("src.print_generator.entrypoint.dynamodb") as mock_ddb:
         mock_ddb.Table.return_value = mock_table
-        result = _get_child_current_unit_order("child-error")
+        with patch("src.print_generator.entrypoint.logger") as mock_logger:
+            result = _get_child_current_unit_order("child-error")
 
     assert result == 1
+    mock_logger.warning.assert_called_once()
+
+
+async def test_get_child_current_unit_order_logs_warning_on_client_error():
+    """_get_child_current_unit_order logs a warning on ClientError and returns 1."""
+    from botocore.exceptions import ClientError
+    from src.print_generator.entrypoint import _get_child_current_unit_order
+
+    mock_table = MagicMock()
+    mock_table.get_item.side_effect = ClientError(
+        {"Error": {"Code": "ProvisionedThroughputExceededException", "Message": "Throttled"}},
+        "GetItem",
+    )
+
+    with patch("src.print_generator.entrypoint.dynamodb") as mock_ddb:
+        mock_ddb.Table.return_value = mock_table
+        with patch("src.print_generator.entrypoint.logger") as mock_logger:
+            result = _get_child_current_unit_order("child-throttled")
+
+    assert result == 1
+    mock_logger.warning.assert_called_once()
+
+
+async def test_determine_next_problem_failure_falls_back_to_defaults(common_mocks):
+    """When determine_next_problem raises an exception, fall back to default values."""
+    from src.print_generator.entrypoint import handle_generate_print
+
+    child_id = "child-error"
+    payload = {
+        "action": "generate_print",
+        "child_id": child_id,
+        "params": {},
+    }
+
+    with patch("src.print_generator.entrypoint._get_child_current_unit_order", return_value=3):
+        with patch(
+            "src.adaptive_learning.agent.determine_next_problem",
+            side_effect=RuntimeError("LLM service unavailable"),
+        ):
+            result = await handle_generate_print(payload)
+
+    # Verify fallback defaults were used for generate_print
+    common_mocks["generate_print"].assert_called_once_with(
+        child_id=child_id,
+        subcategory="addition_no_carry",
+        difficulty=1,
+        question_count=8,
+        weak_areas=[],
+    )
+
+    # Verify the result is still successful (print was generated)
+    assert "print_id" in result
+    assert "s3_key" in result
+    assert "questions" in result

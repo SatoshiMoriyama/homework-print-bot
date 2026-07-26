@@ -1,0 +1,24 @@
+{
+  "project_type": "Monorepo with LINE webhook Lambda (TypeScript) + AgentCore agents (Python) + CDK infra (TypeScript)",
+  "language": "TypeScript + Python",
+  "build_system": "pnpm workspaces, uv for Python",
+  "test_framework": "vitest for TypeScript functions, pytest with pytest-asyncio for Python agent",
+  "build_command": "pnpm install && pnpm typecheck",
+  "test_command": "pnpm test (runs vitest in functions package), cd packages/agent && uv run pytest (for Python)",
+  "verification_instructions": "1. pnpm install, 2. pnpm typecheck (runs tsc --noEmit for functions and infra), 3. Python: cd packages/agent && uv run pytest",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "pnpm install for Node, cd packages/agent && uv sync for Python",
+  "environment_constraints": "Network mode not confirmed, but changes are code-only. No new dependencies needed.",
+  "contribution_requirements": "CI checks TypeScript type-check (pnpm typecheck). No Python CI configured.",
+  "key_patterns": "handler.ts dispatches LINE commands via invokeAgent() to AgentCore. main.py routes actions to handler functions. print_generator/entrypoint.py's handle_generate_print() reads params dict from payload. adaptive_learning/agent.py has determine_next_problem(child_id, current_unit_order) returning {category, subcategory, difficulty, question_count, weak_areas, should_advance}. Children table has current_unit_order field. CHILDREN_TABLE env var is available in agent code.",
+  "relevant_files": [
+    "packages/functions/src/webhook/handler.ts",
+    "packages/agent/src/main.py",
+    "packages/agent/src/print_generator/entrypoint.py",
+    "packages/agent/src/adaptive_learning/agent.py",
+    "packages/agent/src/adaptive_learning/stats.py",
+    "packages/functions/src/shared/family.ts",
+    "packages/agent/tests/conftest.py"
+  ],
+  "directory_structure": "packages/functions/src/webhook/ - LINE webhook handler, packages/functions/src/shared/ - shared utilities (family, state, agentcore, s3), packages/agent/src/ - AgentCore agents (print_generator, grading, adaptive_learning), packages/agent/tests/ - pytest tests, packages/infra/ - CDK infra"
+}
