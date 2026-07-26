@@ -40,6 +40,7 @@ export class RendererConstruct extends Construct {
             return [
               `mkdir -p ${outputDir}/fonts`,
               `cp ${fontsSource}/NotoSansJP-Regular.ttf ${outputDir}/fonts/`,
+              `cp ${fontsSource}/NotoColorEmoji-Regular.ttf ${outputDir}/fonts/`,
               `cp ${fontsSource}/fonts.conf ${outputDir}/fonts/`,
             ];
           },

@@ -26,10 +26,15 @@ function setupFonts(): void {
 
   fs.mkdirSync(FONTS_DIR, { recursive: true });
 
-  // Copy font file
+  // Copy font files
   const fontSrc = path.join(SOURCE_FONTS_DIR, "NotoSansJP-Regular.ttf");
   if (fs.existsSync(fontSrc)) {
     fs.copyFileSync(fontSrc, path.join(FONTS_DIR, "NotoSansJP-Regular.ttf"));
+  }
+
+  const emojiSrc = path.join(SOURCE_FONTS_DIR, "NotoColorEmoji-Regular.ttf");
+  if (fs.existsSync(emojiSrc)) {
+    fs.copyFileSync(emojiSrc, path.join(FONTS_DIR, "NotoColorEmoji-Regular.ttf"));
   }
 
   // Copy fonts.conf

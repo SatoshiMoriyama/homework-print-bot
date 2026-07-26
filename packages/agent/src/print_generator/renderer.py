@@ -175,7 +175,7 @@ footer {
   </section>
 
   <footer>
-    <p>がんばったね！</p>
+    <p>がんばったね！ ⭐</p>
   </footer>
 </div>
 </body>
