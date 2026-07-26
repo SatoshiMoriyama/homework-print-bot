@@ -88,7 +88,14 @@ async def handle_generate_print(payload: dict) -> dict:
             question_count = recommendation["question_count"]
             weak_areas = recommendation.get("weak_areas", [])
         except Exception as e:
-            return {"error": f"Failed to determine next problem: {e}"}
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to determine next problem, falling back to defaults: {e}")
+            subcategory = "addition_no_carry"
+            category = "number_calculation"
+            difficulty = 1
+            question_count = 8
+            weak_areas = []
 
     # Generate questions
     result = generate_print(

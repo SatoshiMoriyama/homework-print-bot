@@ -263,10 +263,10 @@ class TestHandleGeneratePrintAutoSelect:
 
 
 class TestHandleGeneratePrintAutoSelectErrors:
-    """Tests for error handling in the auto-select path."""
+    """Tests for error handling in the auto-select path (fallback to defaults)."""
 
     @pytest.mark.asyncio
-    async def test_dynamodb_client_error_returns_error_dict(
+    async def test_dynamodb_client_error_falls_back_to_defaults(
         self,
         mock_dynamodb,
         mock_s3_client,
@@ -274,7 +274,8 @@ class TestHandleGeneratePrintAutoSelectErrors:
         mock_render_to_png,
         mock_determine_next_problem,
     ):
-        """When DynamoDB get_item raises ClientError, should return structured error."""
+        """When DynamoDB get_item raises ClientError, should fall back to default
+        subcategory (addition_no_carry) and continue generating a print."""
         from botocore.exceptions import ClientError
 
         children_table = MagicMock()
@@ -298,13 +299,22 @@ class TestHandleGeneratePrintAutoSelectErrors:
 
         result = await handle_generate_print(payload)
 
-        assert "error" in result
-        assert "Failed to determine next problem" in result["error"]
-        # generate_print should NOT have been called
-        mock_generate_print.assert_not_called()
+        # Should NOT return an error - should fall back and generate a print
+        assert "error" not in result
+        assert "print_id" in result
+        assert "questions" in result
+
+        # generate_print should be called with fallback defaults
+        mock_generate_print.assert_called_once_with(
+            child_id="child-1",
+            subcategory="addition_no_carry",
+            difficulty=1,
+            question_count=8,
+            weak_areas=[],
+        )
 
     @pytest.mark.asyncio
-    async def test_determine_next_problem_raises_returns_error_dict(
+    async def test_determine_next_problem_raises_falls_back_to_defaults(
         self,
         mock_dynamodb,
         mock_s3_client,
@@ -312,7 +322,8 @@ class TestHandleGeneratePrintAutoSelectErrors:
         mock_render_to_png,
         mock_determine_next_problem,
     ):
-        """When determine_next_problem raises an exception, should return structured error."""
+        """When determine_next_problem raises an exception, should fall back to
+        default subcategory and continue generating a print."""
         children_table = MagicMock()
         children_table.get_item.return_value = {
             "Item": {"child_id": "child-1", "current_unit_order": 2}
@@ -335,13 +346,22 @@ class TestHandleGeneratePrintAutoSelectErrors:
 
         result = await handle_generate_print(payload)
 
-        assert "error" in result
-        assert "Failed to determine next problem" in result["error"]
-        assert "Recommendation engine failed" in result["error"]
-        mock_generate_print.assert_not_called()
+        # Should NOT return an error - should fall back and generate a print
+        assert "error" not in result
+        assert "print_id" in result
+        assert "questions" in result
+
+        # generate_print should be called with fallback defaults
+        mock_generate_print.assert_called_once_with(
+            child_id="child-1",
+            subcategory="addition_no_carry",
+            difficulty=1,
+            question_count=8,
+            weak_areas=[],
+        )
 
     @pytest.mark.asyncio
-    async def test_non_numeric_unit_order_returns_error_dict(
+    async def test_non_numeric_unit_order_falls_back_to_defaults(
         self,
         mock_dynamodb,
         mock_s3_client,
@@ -350,7 +370,7 @@ class TestHandleGeneratePrintAutoSelectErrors:
         mock_determine_next_problem,
     ):
         """When current_unit_order is a non-numeric string, int() raises ValueError
-        which should be caught and returned as structured error."""
+        which should be caught and fall back to defaults."""
         children_table = MagicMock()
         children_table.get_item.return_value = {
             "Item": {"child_id": "child-1", "current_unit_order": "not_a_number"}
@@ -371,9 +391,19 @@ class TestHandleGeneratePrintAutoSelectErrors:
 
         result = await handle_generate_print(payload)
 
-        assert "error" in result
-        assert "Failed to determine next problem" in result["error"]
-        mock_generate_print.assert_not_called()
+        # Should NOT return an error - should fall back and generate a print
+        assert "error" not in result
+        assert "print_id" in result
+        assert "questions" in result
+
+        # generate_print should be called with fallback defaults
+        mock_generate_print.assert_called_once_with(
+            child_id="child-1",
+            subcategory="addition_no_carry",
+            difficulty=1,
+            question_count=8,
+            weak_areas=[],
+        )
 
     @pytest.mark.asyncio
     async def test_empty_string_subcategory_uses_explicit_path(
