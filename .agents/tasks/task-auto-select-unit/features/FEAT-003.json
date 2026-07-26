@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "fix",
   "description": "Address code review findings: improve error handling in _get_child_current_unit_order, add comment explaining current_unit_order write-back design, add try/except for determine_next_problem, and add test for determine_next_problem failure",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Replace bare except Exception: pass in _get_child_current_unit_order with proper logging using Python's logging module. Log a warning on DynamoDB errors before falling back to 1.",
     "Add a comment in the auto-select branch explaining that current_unit_order write-back happens in the grading flow via adaptive_learning/stats.py's _try_unlock_next_unit().",
@@ -20,5 +20,5 @@
     "Run cd packages/agent && uv run pytest -v and confirm all tests pass"
   ],
   "blocked_reason": null,
-  "findings": null
+  "findings": "All 13 tests pass (9 entrypoint tests + 4 renderer tests). Kept broad Exception catch in _get_child_current_unit_order but added logging.warning so errors are no longer silently swallowed. The existing test_get_child_current_unit_order_exception_fallback test was updated to also verify the warning is logged."
 }
