@@ -15,6 +15,7 @@ def _generate_id() -> str:
         return uuid.uuid4().hex
 
 from .agent import grade_from_image, grade_from_text
+from ..adaptive_learning.stats import update_learning_stats
 
 S3_BUCKET = os.environ.get("BUCKET_NAME", "")
 PRINTS_TABLE = os.environ.get("PRINTS_TABLE", "homework-bot-prints")
@@ -67,7 +68,9 @@ async def handle_grade_answer(payload: dict) -> dict:
         }
 
     # Save full results
-    return await _save_grading_results(child_id, print_id, grading_result, image_s3_key)
+    subcategory = print_data.get("subcategory", "")
+    category = print_data.get("category", "")
+    return await _save_grading_results(child_id, print_id, grading_result, image_s3_key, subcategory, category)
 
 
 
@@ -97,7 +100,7 @@ async def handle_grade_text_answer(payload: dict) -> dict:
     # Grade text answers
     grading_result = grade_from_text(text_answers, questions)
 
-    return await _save_grading_results(child_id, print_id, grading_result, "")
+    return await _save_grading_results(child_id, print_id, grading_result, "", print_data.get("subcategory", ""), print_data.get("category", ""))
 
 
 async def _save_grading_results(
@@ -105,6 +108,8 @@ async def _save_grading_results(
     print_id: str,
     grading_result: dict,
     image_s3_key: str,
+    subcategory: str,
+    category: str,
 ) -> dict:
     """Save grading results to DynamoDB."""
     results = grading_result.get("results", [])
@@ -148,6 +153,9 @@ async def _save_grading_results(
         ExpressionAttributeNames={"#s": "status"},
         ExpressionAttributeValues={":s": "graded"},
     )
+
+    # Update learning stats
+    update_learning_stats(child_id, details, subcategory, category)
 
     return {
         "status": "complete",
