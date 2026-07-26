@@ -1,0 +1,14 @@
+{
+  "task_id": "task-auto-select-unit",
+  "task_description": "プリント生成時に固定の addition_no_carry ではなく、子供の学習進捗 (current_unit_order) に応じた単元を adaptive_learning の推薦ロジックで自動選択する (Issue #23)",
+  "status": "completed",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "TypeScript typecheck passes. All 14 vitest tests pass. All 10 pytest tests pass (6 original + 4 error handling tests added after review). Semantic review issues addressed (error handling, truthiness fix, failure mode tests)."
+  }
+}

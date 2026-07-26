@@ -1,11 +1,14 @@
 """Entrypoint for Grading Agent."""
 
 import json
+import logging
 import os
 from datetime import datetime
 import boto3
 from ulid import ULID as _ULID
 import uuid
+
+logger = logging.getLogger(__name__)
 
 def _generate_id() -> str:
     """Generate a unique ID (fallback to uuid4 if ULID fails)."""
@@ -15,14 +18,16 @@ def _generate_id() -> str:
         return uuid.uuid4().hex
 
 from .agent import grade_from_image, grade_from_text
+from ..adaptive_learning.stats import update_learning_stats
 
 S3_BUCKET = os.environ.get("BUCKET_NAME", "")
 PRINTS_TABLE = os.environ.get("PRINTS_TABLE", "homework-bot-prints")
 GRADING_TABLE = os.environ.get("GRADING_RESULTS_TABLE", "homework-bot-grading-results")
 LEARNING_STATS_TABLE = os.environ.get("LEARNING_STATS_TABLE", "homework-bot-learning-stats")
 
-s3_client = boto3.client("s3", region_name="ap-northeast-1")
-dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-1")
+AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
+s3_client = boto3.client("s3", region_name=AWS_REGION)
+dynamodb = boto3.resource("dynamodb", region_name=AWS_REGION)
 
 
 
@@ -67,7 +72,9 @@ async def handle_grade_answer(payload: dict) -> dict:
         }
 
     # Save full results
-    return await _save_grading_results(child_id, print_id, grading_result, image_s3_key)
+    subcategory = print_data.get("subcategory", "")
+    category = print_data.get("category", "")
+    return await _save_grading_results(child_id, print_id, grading_result, image_s3_key, subcategory, category)
 
 
 
@@ -97,7 +104,7 @@ async def handle_grade_text_answer(payload: dict) -> dict:
     # Grade text answers
     grading_result = grade_from_text(text_answers, questions)
 
-    return await _save_grading_results(child_id, print_id, grading_result, "")
+    return await _save_grading_results(child_id, print_id, grading_result, "", print_data.get("subcategory", ""), print_data.get("category", ""))
 
 
 async def _save_grading_results(
@@ -105,8 +112,14 @@ async def _save_grading_results(
     print_id: str,
     grading_result: dict,
     image_s3_key: str,
+    subcategory: str,
+    category: str,
 ) -> dict:
-    """Save grading results to DynamoDB."""
+    """Save grading results to DynamoDB and update learning stats.
+
+    Persists the grading results and print status to DynamoDB, then
+    updates the child's learning statistics on a best-effort basis.
+    """
     results = grading_result.get("results", [])
 
     score = sum(1 for r in results if r.get("is_correct"))
@@ -148,6 +161,17 @@ async def _save_grading_results(
         ExpressionAttributeNames={"#s": "status"},
         ExpressionAttributeValues={":s": "graded"},
     )
+
+    # Update learning stats (best-effort)
+    if subcategory:
+        try:
+            update_learning_stats(child_id, details, subcategory, category)
+        except Exception:
+            logger.exception(
+                "Failed to update learning stats for child_id=%s, subcategory=%s",
+                child_id,
+                subcategory,
+            )
 
     return {
         "status": "complete",
