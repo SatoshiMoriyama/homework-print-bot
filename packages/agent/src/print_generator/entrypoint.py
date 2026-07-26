@@ -47,7 +47,7 @@ async def handle_generate_print(payload: dict) -> dict:
         payload: {
             "action": "generate_print",
             "child_id": "...",
-            "params": {
+            "params": {  # optional - if omitted, auto-selects based on learning progress
                 "category": "...",
                 "subcategory": "...",
                 "difficulty": 1,
@@ -62,10 +62,24 @@ async def handle_generate_print(payload: dict) -> dict:
     child_id = payload["child_id"]
     params = payload.get("params", {})
 
-    subcategory = params.get("subcategory", "addition_no_carry")
-    difficulty = params.get("difficulty", 1)
-    question_count = params.get("question_count", 8)
-    weak_areas = params.get("weak_areas", [])
+    if params.get("subcategory"):
+        # Explicit params provided (backward compatibility, e.g. regenerate_print path)
+        subcategory = params["subcategory"]
+        difficulty = params.get("difficulty", 1)
+        question_count = params.get("question_count", 8)
+        weak_areas = params.get("weak_areas", [])
+        category = params.get("category", "")
+    else:
+        # Auto-select next unit based on child's learning progress
+        from ..adaptive_learning.agent import determine_next_problem
+
+        current_unit_order = _get_child_current_unit_order(child_id)
+        next_problem = determine_next_problem(child_id, current_unit_order)
+        category = next_problem["category"]
+        subcategory = next_problem["subcategory"]
+        difficulty = next_problem["difficulty"]
+        question_count = next_problem["question_count"]
+        weak_areas = next_problem.get("weak_areas", [])
 
     # Generate questions
     result = generate_print(
@@ -109,7 +123,7 @@ async def handle_generate_print(payload: dict) -> dict:
             "print_id": print_id,
             "child_id": child_id,
             "created_at": _generate_id(),  # Use timestamp
-            "category": params.get("category", ""),
+            "category": category,
             "subcategory": subcategory,
             "difficulty": difficulty,
             "questions": questions,
@@ -208,6 +222,23 @@ async def handle_regenerate_print(payload: dict) -> dict:
         response_data["needs_rendering"] = True
 
     return response_data
+
+
+def _get_child_current_unit_order(child_id: str) -> int:
+    """Fetch the child's current_unit_order from DynamoDB.
+
+    Returns 1 if the child record is not found (default to first unit).
+    """
+    children_table_name = os.environ.get("CHILDREN_TABLE", "homework-bot-children")
+    table = dynamodb.Table(children_table_name)
+    try:
+        response = table.get_item(Key={"child_id": child_id})
+        item = response.get("Item")
+        if item:
+            return int(item.get("current_unit_order", 1))
+    except Exception:
+        pass
+    return 1
 
 
 def _get_unit_label(subcategory: str) -> str:
