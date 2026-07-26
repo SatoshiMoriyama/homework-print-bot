@@ -1,7 +1,57 @@
 """Tests for print_generator.entrypoint handle_generate_print."""
 
+import sys
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
+# ---------------------------------------------------------------------------
+# Mock unavailable third-party modules AND internal modules that depend on them
+# BEFORE importing the entrypoint module.
+#
+# The problem: entrypoint.py does `from .agent import generate_print, regenerate_print`
+# which triggers agent.py (imports strands + uses Python 3.10 syntax on Py3.9).
+# Also, adaptive_learning/agent.py imports strands.
+# Solution: pre-populate sys.modules with mocks for these modules.
+# ---------------------------------------------------------------------------
+
+# Third-party modules not available in test env
+_mock_strands = MagicMock()
+_mock_strands_models = MagicMock()
+_mock_strands_models_bedrock = MagicMock()
+_mock_playwright = MagicMock()
+_mock_playwright_async_api = MagicMock()
+
+sys.modules.setdefault("strands", _mock_strands)
+sys.modules.setdefault("strands.models", _mock_strands_models)
+sys.modules.setdefault("strands.models.bedrock", _mock_strands_models_bedrock)
+sys.modules.setdefault("playwright", _mock_playwright)
+sys.modules.setdefault("playwright.async_api", _mock_playwright_async_api)
+
+# Mock the internal agent modules that contain incompatible syntax (Py 3.10+)
+# and strands dependencies. We mock them as modules with the needed attributes.
+_mock_print_agent_module = MagicMock()
+_mock_print_agent_module.generate_print = MagicMock()
+_mock_print_agent_module.regenerate_print = MagicMock()
+sys.modules.setdefault("src.print_generator.agent", _mock_print_agent_module)
+
+_mock_adaptive_agent_module = MagicMock()
+_mock_adaptive_agent_module.determine_next_problem = MagicMock()
+sys.modules.setdefault("src.adaptive_learning.agent", _mock_adaptive_agent_module)
+
+# Now it's safe to import the entrypoint module
+from src.print_generator.entrypoint import handle_generate_print  # noqa: E402
+
+# Ensure the adaptive_learning package has an 'agent' attribute pointing to
+# our mock so that unittest.mock.patch can resolve the dotted path correctly.
+import src.adaptive_learning as _adaptive_learning_pkg  # noqa: E402
+
+_adaptive_learning_pkg.agent = _mock_adaptive_agent_module  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -83,8 +133,6 @@ class TestHandleGeneratePrintAutoSelect:
 
         mock_dynamodb.Table.side_effect = table_side_effect
 
-        from src.print_generator.entrypoint import handle_generate_print
-
         payload = {
             "action": "generate_print",
             "child_id": "child-1",
@@ -135,8 +183,6 @@ class TestHandleGeneratePrintAutoSelect:
 
         mock_dynamodb.Table.side_effect = table_side_effect
 
-        from src.print_generator.entrypoint import handle_generate_print
-
         payload = {
             "action": "generate_print",
             "child_id": "child-1",
@@ -167,8 +213,6 @@ class TestHandleGeneratePrintAutoSelect:
             return prints_table
 
         mock_dynamodb.Table.side_effect = table_side_effect
-
-        from src.print_generator.entrypoint import handle_generate_print
 
         payload = {
             "action": "generate_print",
@@ -204,8 +248,6 @@ class TestHandleGeneratePrintAutoSelect:
 
         mock_dynamodb.Table.side_effect = table_side_effect
 
-        from src.print_generator.entrypoint import handle_generate_print
-
         payload = {
             "action": "generate_print",
             "child_id": "child-1",
@@ -236,8 +278,6 @@ class TestHandleGeneratePrintExplicitSubcategory:
         determine_next_problem or CHILDREN_TABLE."""
         prints_table = MagicMock()
         mock_dynamodb.Table.return_value = prints_table
-
-        from src.print_generator.entrypoint import handle_generate_print
 
         payload = {
             "action": "generate_print",
@@ -279,8 +319,6 @@ class TestHandleGeneratePrintExplicitSubcategory:
         """When params contains only subcategory, other fields use defaults."""
         prints_table = MagicMock()
         mock_dynamodb.Table.return_value = prints_table
-
-        from src.print_generator.entrypoint import handle_generate_print
 
         payload = {
             "action": "generate_print",
