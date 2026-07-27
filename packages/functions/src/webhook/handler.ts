@@ -202,9 +202,26 @@ async function handleTextMessage(
         }, userId);
         if (result.error) {
           await pushText(userId, `りれき取得エラー: ${result.error}`);
+        } else if (result.message) {
+          await pushText(userId, result.message as string);
         } else {
-          const summary = result.summary as string || JSON.stringify(result, null, 2);
-          await pushText(userId, `📊 学習りれき\n\n${summary}`);
+          const lines = [
+            `📊 学習りれき`,
+            ``,
+            `正解率: ${result.overall_accuracy}%`,
+            `総問題数: ${result.total_problems}問（正解: ${result.total_correct}問）`,
+            `現在の単元: ${result.current_unit || "未開始"}`,
+            `進捗: ${result.units_completed}/${result.total_units} 単元`,
+          ];
+          const weak = result.weak_areas as string[];
+          if (weak && weak.length > 0) {
+            lines.push(``, `苦手: ${weak.join("、")}`);
+          }
+          const strong = result.strong_areas as string[];
+          if (strong && strong.length > 0) {
+            lines.push(`得意: ${strong.join("、")}`);
+          }
+          await pushText(userId, lines.join("\n"));
         }
       } catch (err) {
         console.error("AgentCore invoke error (get_learning_summary):", err);

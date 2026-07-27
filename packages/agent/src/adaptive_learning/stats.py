@@ -2,6 +2,7 @@
 
 import os
 from datetime import datetime
+from decimal import Decimal
 import boto3
 
 AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
@@ -70,7 +71,7 @@ def update_learning_stats(child_id: str, grading_details: list[dict], subcategor
             "category": category,
             "total_attempts": total_attempts,
             "correct_count": correct_count,
-            "accuracy_rate": round(accuracy_rate, 3),
+            "accuracy_rate": Decimal(str(round(accuracy_rate, 3))),
             "current_difficulty": current_difficulty,
             "last_attempted_at": datetime.now().isoformat(),
             "streak_correct": streak,
@@ -114,7 +115,7 @@ def _try_unlock_next_unit(child_id: str, current_order: int) -> None:
                 "category": _get_category_by_order(next_order),
                 "total_attempts": 0,
                 "correct_count": 0,
-                "accuracy_rate": 0,
+                "accuracy_rate": Decimal("0"),
                 "current_difficulty": 1,
                 "last_attempted_at": "",
                 "streak_correct": 0,
