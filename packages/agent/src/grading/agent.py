@@ -3,8 +3,16 @@
 import json
 import os
 import base64
+from decimal import Decimal
 from strands import Agent, tool
 from strands.models.bedrock import BedrockModel
+
+
+def _decimal_default(obj):
+    """JSON serializer for Decimal objects."""
+    if isinstance(obj, Decimal):
+        return int(obj) if obj == int(obj) else float(obj)
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 BEDROCK_MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "jp.anthropic.claude-sonnet-4-6")
 AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-1")
@@ -53,7 +61,7 @@ def grade_from_image(
     """
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-    questions_text = json.dumps(questions, ensure_ascii=False, indent=2)
+    questions_text = json.dumps(questions, ensure_ascii=False, indent=2, default=_decimal_default)
 
     prompt = f"""以下の問題の正解情報と、添付画像の手書き回答を比較して採点してください。
 
@@ -121,7 +129,7 @@ def grade_from_text(
         Grading results dict.
     """
     answers_text = json.dumps(text_answers, ensure_ascii=False, indent=2)
-    questions_text = json.dumps(questions, ensure_ascii=False, indent=2)
+    questions_text = json.dumps(questions, ensure_ascii=False, indent=2, default=_decimal_default)
 
     prompt = f"""以下の問題の正解情報と、テキストで提出された回答を比較して採点してください。
 
