@@ -3,12 +3,24 @@
 import json
 import logging
 import os
+from decimal import Decimal
 from datetime import datetime
 import boto3
 from ulid import ULID as _ULID
 import uuid
 
 logger = logging.getLogger(__name__)
+
+
+def _convert_decimals(obj):
+    """Recursively convert Decimal values to int or float for JSON serialization."""
+    if isinstance(obj, Decimal):
+        return int(obj) if obj == int(obj) else float(obj)
+    elif isinstance(obj, dict):
+        return {k: _convert_decimals(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_decimals(i) for i in obj]
+    return obj
 
 def _generate_id() -> str:
     """Generate a unique ID (fallback to uuid4 if ULID fails)."""
@@ -64,12 +76,12 @@ async def handle_grade_answer(payload: dict) -> dict:
     # Check for unreadable questions
     unreadable = grading_result.get("unreadable_questions", [])
     if unreadable:
-        return {
+        return _convert_decimals({
             "status": "partial",
             "unreadable_questions": unreadable,
             "partial_results": grading_result.get("results", []),
             "print_id": print_id,
-        }
+        })
 
     # Save full results
     subcategory = print_data.get("subcategory", "")
@@ -173,10 +185,10 @@ async def _save_grading_results(
                 subcategory,
             )
 
-    return {
+    return _convert_decimals({
         "status": "complete",
         "result_id": result_id,
         "score": score,
         "total": total,
         "details": details,
-    }
+    })
