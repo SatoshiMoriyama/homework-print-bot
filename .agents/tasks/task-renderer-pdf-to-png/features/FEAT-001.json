@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "feat",
   "description": "Renderer Lambda を PDF 経由 PNG 変換に切り替える。page.screenshot() の代わりに page.pdf({ format: 'A4' }) で PDF バッファを取得し、pdf-to-png-converter で PNG に変換する。複数ページの場合は全ページの PNG を生成して S3 にアップロードし、レスポンスに pngS3Keys 配列を返す (後方互換性のため pngS3Key も1ページ目で維持)。",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. packages/functions/package.json に pdf-to-png-converter 依存を追加する",
     "2. packages/functions/src/renderer/index.ts を書き換える: (a) page.pdf({ format: 'A4', printBackground: true }) で PDF バッファを取得, (b) pdf-to-png-converter の pdfToPng() でページごとの PNG バッファ配列を取得, (c) 各ページの PNG を S3 にアップロード (1ページ目: prints/child1/abc123.png, 2ページ目: prints/child1/abc123_page2.png, ...), (d) レスポンスの型を拡張して pngS3Keys: string[] を追加し、後方互換で pngS3Key は1ページ目のキーを返す",
@@ -27,5 +27,5 @@
     "export PATH=/opt/toolchains/.nvm/versions/node/v20.20.2/bin:$PATH && cd /projects/sandbox/homework-print-bot && pnpm test"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "All changes implemented cleanly. typecheck and tests pass on first try. pdf-to-png-converter v4 installed successfully. The pre-existing test issue with chromium.args was fixed by including --font-render-hinting=none in the expected args array."
 }
