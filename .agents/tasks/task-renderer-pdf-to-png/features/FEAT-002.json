@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-002",
+  "type": "fix",
+  "description": "レビュー指摘対応: pdfToPng が空配列を返した場合のガード追加、pdfToPng エラーケースと空配列ケースのテスト追加",
+  "status": "completed",
+  "steps": [
+    "1. packages/functions/src/renderer/index.ts で pdfToPng() 呼び出し後に pngPages.length === 0 チェックを追加し、空の場合はエラーをスローする",
+    "2. packages/functions/src/renderer/index.test.ts に pdfToPng が空配列を返すケースのテストを追加する",
+    "3. packages/functions/src/renderer/index.test.ts に pdfToPng が例外を投げるケースのテストを追加する",
+    "4. pnpm typecheck がパスすることを確認",
+    "5. pnpm test がパスすることを確認"
+  ],
+  "acceptance_criteria": [
+    "pdfToPng が空配列を返した場合にエラーがスローされる",
+    "pdfToPng 空配列ケースのテストが存在しパスする",
+    "pdfToPng 例外ケースのテストが存在しパスする",
+    "pnpm typecheck がパスする",
+    "pnpm test が全テストパスする (17/17)"
+  ],
+  "verification": [
+    "export PATH=/opt/toolchains/.nvm/versions/node/v20.20.2/bin:$PATH && cd /projects/sandbox/homework-print-bot && pnpm typecheck",
+    "export PATH=/opt/toolchains/.nvm/versions/node/v20.20.2/bin:$PATH && cd /projects/sandbox/homework-print-bot && pnpm test"
+  ],
+  "blocked_reason": null,
+  "findings": "All three review items addressed. Guard throws with descriptive message. Both new tests verify browser is properly closed even when pdfToPng fails."
+}

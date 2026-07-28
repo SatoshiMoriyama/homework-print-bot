@@ -30,7 +30,7 @@ export class RendererConstruct extends Construct {
       bundling: {
         minify: true,
         sourceMap: true,
-        nodeModules: ["@sparticuz/chromium", "puppeteer-core"],
+        nodeModules: ["@sparticuz/chromium", "puppeteer-core", "pdf-to-png-converter"],
         commandHooks: {
           beforeBundling(_inputDir: string, _outputDir: string): string[] {
             return [];
