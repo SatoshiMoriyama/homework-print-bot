@@ -9,6 +9,6 @@
     "tests": "pass",
     "test_quality": "pass",
     "docker_build": "skipped",
-    "summary": "pnpm typecheck passes, pnpm test passes (17/17 tests including 8 renderer tests). Tests cover PDF generation, multi-page PNG conversion, S3 upload, error handling, empty page guard, pdfToPng exception handling, and backward compatibility."
+    "summary": "pnpm typecheck passes, pnpm test passes (18/18 tests including 9 renderer tests). Tests cover PDF generation, multi-page PNG conversion, S3 upload, error handling, empty page guard, pdfToPng exception handling, undefined content guard, and backward compatibility."
   }
 }
