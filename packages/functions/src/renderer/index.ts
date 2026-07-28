@@ -110,6 +110,10 @@ export async function handler(event: RendererEvent): Promise<RendererResponse> {
   // Convert PDF to PNG pages
   const pngPages = await pdfToPng(pdfBuffer);
 
+  if (pngPages.length === 0) {
+    throw new Error("pdfToPng returned no pages: the PDF may be empty or corrupted");
+  }
+
   // Upload each PNG page to S3
   const baseKey = s3Key.replace(/\.html$/, "");
   const pngS3Keys: string[] = [];

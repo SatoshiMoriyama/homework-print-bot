@@ -195,6 +195,40 @@ describe("renderer handler", () => {
     await expect(handler(event)).rejects.toThrow("s3Key is required in the event");
   });
 
+  it("should throw when pdfToPng returns an empty array", async () => {
+    const htmlContent = "<html><body>Empty PDF</body></html>";
+    mockSend.mockResolvedValueOnce({
+      Body: { transformToString: vi.fn().mockResolvedValue(htmlContent) },
+    });
+    mockPdfToPng.mockResolvedValue([]);
+
+    const event: RendererEvent = {
+      s3Key: "prints/child1/abc.html",
+      bucketName: "my-bucket",
+    };
+
+    await expect(handler(event)).rejects.toThrow(
+      "pdfToPng returned no pages: the PDF may be empty or corrupted"
+    );
+    expect(mockBrowserClose).toHaveBeenCalled();
+  });
+
+  it("should throw when pdfToPng throws an exception", async () => {
+    const htmlContent = "<html><body>Bad PDF</body></html>";
+    mockSend.mockResolvedValueOnce({
+      Body: { transformToString: vi.fn().mockResolvedValue(htmlContent) },
+    });
+    mockPdfToPng.mockRejectedValue(new Error("Invalid PDF structure"));
+
+    const event: RendererEvent = {
+      s3Key: "prints/child1/abc.html",
+      bucketName: "my-bucket",
+    };
+
+    await expect(handler(event)).rejects.toThrow("Invalid PDF structure");
+    expect(mockBrowserClose).toHaveBeenCalled();
+  });
+
   it("should close browser even if pdf generation fails", async () => {
     const htmlContent = "<html><body>Test</body></html>";
     mockSend.mockResolvedValueOnce({
