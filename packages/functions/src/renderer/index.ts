@@ -119,13 +119,18 @@ export async function handler(event: RendererEvent): Promise<RendererResponse> {
   const pngS3Keys: string[] = [];
 
   for (let i = 0; i < pngPages.length; i++) {
+    const content = pngPages[i].content;
+    if (!content) {
+      throw new Error(`pdfToPng returned undefined content for page ${i + 1}`);
+    }
+
     const pageKey = i === 0 ? `${baseKey}.png` : `${baseKey}_page${i + 1}.png`;
     pngS3Keys.push(pageKey);
 
     const putCommand = new PutObjectCommand({
       Bucket: bucketName,
       Key: pageKey,
-      Body: pngPages[i].content,
+      Body: content,
       ContentType: "image/png",
     });
     await s3Client.send(putCommand);

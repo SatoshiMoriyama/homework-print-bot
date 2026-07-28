@@ -244,4 +244,25 @@ describe("renderer handler", () => {
     await expect(handler(event)).rejects.toThrow("PDF generation failed");
     expect(mockBrowserClose).toHaveBeenCalled();
   });
+
+  it("should throw when pdfToPng returns a page with undefined content", async () => {
+    const htmlContent = "<html><body>Broken page</body></html>";
+    mockSend.mockResolvedValueOnce({
+      Body: { transformToString: vi.fn().mockResolvedValue(htmlContent) },
+    });
+    mockPdfToPng.mockResolvedValue([
+      { content: undefined, name: "page_1.png" },
+    ]);
+
+    const event: RendererEvent = {
+      s3Key: "prints/child1/abc.html",
+      bucketName: "my-bucket",
+    };
+
+    await expect(handler(event)).rejects.toThrow(
+      "pdfToPng returned undefined content for page 1"
+    );
+    // Should not have attempted to upload
+    expect(mockSend).toHaveBeenCalledTimes(1); // Only the GetObject call
+  });
 });
