@@ -1,7 +1,14 @@
 {
   "task_id": "task-renderer-pdf-to-png",
   "task_description": "Renderer Lambda を PDF 経由 PNG 変換に切り替えて A4 自動フィットを実現する",
-  "status": "in_progress",
-  "feature_order": ["FEAT-001"],
-  "blocked_reason": null
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "pnpm typecheck passes, pnpm test passes (17/17 tests including 8 renderer tests). Tests cover PDF generation, multi-page PNG conversion, S3 upload, error handling, empty page guard, pdfToPng exception handling, and backward compatibility."
+  }
 }
