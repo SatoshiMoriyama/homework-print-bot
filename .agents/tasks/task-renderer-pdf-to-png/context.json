@@ -1,0 +1,22 @@
+{
+  "project_type": "Monorepo (pnpm workspace) - LINE Bot with AI homework generator, TypeScript Lambda + Python Agent + CDK infra",
+  "language": "TypeScript (functions/infra), Python (agent)",
+  "build_system": "pnpm workspace with corepack. Node.js available at /opt/toolchains/.nvm/versions/node/v20.20.2/bin",
+  "test_framework": "vitest for functions package",
+  "build_command": "export PATH=/opt/toolchains/.nvm/versions/node/v20.20.2/bin:$PATH && cd /projects/sandbox/homework-print-bot && pnpm typecheck",
+  "test_command": "export PATH=/opt/toolchains/.nvm/versions/node/v20.20.2/bin:$PATH && cd /projects/sandbox/homework-print-bot && pnpm test",
+  "verification_instructions": "1. Run pnpm typecheck to ensure no type errors. 2. Run pnpm test to ensure all tests pass.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "export PATH=/opt/toolchains/.nvm/versions/node/v20.20.2/bin:$PATH && cd /projects/sandbox/homework-print-bot && corepack enable pnpm && pnpm install",
+  "environment_constraints": "Node.js 20 is at /opt/toolchains/.nvm/versions/node/v20.20.2/bin (must be added to PATH). pnpm available via corepack. No Docker daemon available for building. Network mode allows package installation from registries.",
+  "contribution_requirements": "CI runs pnpm typecheck. Tests use vitest with mocking.",
+  "key_patterns": "Renderer Lambda: packages/functions/src/renderer/index.ts uses Puppeteer + @sparticuz/chromium. CDK bundling in packages/infra/lib/constructs/renderer.ts uses nodejs.NodejsFunction with nodeModules for chromium/puppeteer. Tests mock S3 and Puppeteer thoroughly.",
+  "relevant_files": [
+    "packages/functions/src/renderer/index.ts",
+    "packages/functions/src/renderer/index.test.ts",
+    "packages/functions/package.json",
+    "packages/infra/lib/constructs/renderer.ts",
+    "packages/infra/package.json"
+  ],
+  "directory_structure": "packages/functions/src/renderer/ - the Lambda handler for HTML-to-PNG conversion. packages/infra/lib/constructs/renderer.ts - CDK construct defining the Lambda with bundling config."
+}

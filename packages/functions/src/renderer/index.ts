@@ -1,13 +1,15 @@
 /**
  * HTML-to-PNG Renderer Lambda
  *
- * Downloads HTML from S3, renders it to PNG using Puppeteer + @sparticuz/chromium,
- * and uploads the PNG back to S3 with the .html extension replaced by .png.
+ * Downloads HTML from S3, renders it to PDF using Puppeteer + @sparticuz/chromium,
+ * converts the PDF pages to PNGs using pdf-to-png-converter,
+ * and uploads the PNGs back to S3.
  */
 
 import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import chromium from "@sparticuz/chromium";
 import puppeteer from "puppeteer-core";
+import { pdfToPng } from "pdf-to-png-converter";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -57,6 +59,7 @@ export interface RendererEvent {
 
 export interface RendererResponse {
   pngS3Key: string;
+  pngS3Keys: string[];
 }
 
 export async function handler(event: RendererEvent): Promise<RendererResponse> {
@@ -93,26 +96,39 @@ export async function handler(event: RendererEvent): Promise<RendererResponse> {
     headless: true,
   });
 
-  let pngBuffer: Buffer;
+  let pdfBuffer: Buffer;
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
-    const screenshot = await page.screenshot({ fullPage: true });
-    pngBuffer = Buffer.from(screenshot);
+    const pdfData = await page.pdf({ format: "A4", printBackground: true });
+    pdfBuffer = Buffer.from(pdfData);
     await page.close();
   } finally {
     await browser.close();
   }
 
-  // Upload PNG to S3, replacing .html extension with .png
-  const pngS3Key = s3Key.replace(/\.html$/, ".png");
-  const putCommand = new PutObjectCommand({
-    Bucket: bucketName,
-    Key: pngS3Key,
-    Body: pngBuffer,
-    ContentType: "image/png",
-  });
-  await s3Client.send(putCommand);
+  // Convert PDF to PNG pages
+  const pngPages = await pdfToPng(pdfBuffer);
 
-  return { pngS3Key };
+  // Upload each PNG page to S3
+  const baseKey = s3Key.replace(/\.html$/, "");
+  const pngS3Keys: string[] = [];
+
+  for (let i = 0; i < pngPages.length; i++) {
+    const pageKey = i === 0 ? `${baseKey}.png` : `${baseKey}_page${i + 1}.png`;
+    pngS3Keys.push(pageKey);
+
+    const putCommand = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: pageKey,
+      Body: pngPages[i].content,
+      ContentType: "image/png",
+    });
+    await s3Client.send(putCommand);
+  }
+
+  return {
+    pngS3Key: pngS3Keys[0],
+    pngS3Keys,
+  };
 }

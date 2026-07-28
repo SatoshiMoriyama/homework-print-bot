@@ -1,0 +1,7 @@
+{
+  "task_id": "task-renderer-pdf-to-png",
+  "task_description": "Renderer Lambda を PDF 経由 PNG 変換に切り替えて A4 自動フィットを実現する",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null
+}

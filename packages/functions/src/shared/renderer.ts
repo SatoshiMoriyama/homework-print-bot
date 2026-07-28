@@ -15,6 +15,7 @@ export interface InvokeRendererParams {
 
 export interface RendererResult {
   pngS3Key: string;
+  pngS3Keys?: string[];
 }
 
 /**

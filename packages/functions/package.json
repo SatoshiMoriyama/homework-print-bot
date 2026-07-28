@@ -18,6 +18,7 @@
     "@aws-sdk/lib-dynamodb": "^3.600.0",
     "@line/bot-sdk": "^9.4.0",
     "@sparticuz/chromium": "^131.0.0",
+    "pdf-to-png-converter": "^4.0.0",
     "puppeteer-core": "^23.0.0",
     "ulid": "^2.3.0"
   },
